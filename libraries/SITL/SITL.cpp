@@ -212,6 +212,9 @@ const AP_Param::GroupInfo SITL::var_info3[] = {
     AP_GROUPINFO("MAG6_DEVID",    8, SITL,  mag_devid[5], 98051),
     AP_GROUPINFO("MAG7_DEVID",    9, SITL,  mag_devid[6], 0),
     AP_GROUPINFO("MAG8_DEVID",    10, SITL, mag_devid[7], 0),
+
+    AP_GROUPINFO("RATE_HZ",  22, SITL,  loop_rate_hz, 1200),
+
     AP_GROUPEND
 
 };
