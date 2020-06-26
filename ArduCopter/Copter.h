@@ -599,6 +599,7 @@ private:
     } gndeffect_state;
 
     bool standby_active;
+    bool standby_last;
 
     // set when we are upgrading parameters from 3.4
     bool upgrading_frame_params;
@@ -780,6 +781,8 @@ private:
 
     // standby.cpp
     void standby_update();
+    void standby_enable();
+    void standby_pin_active();
 
     // Log.cpp
     void Log_Write_Control_Tuning();
