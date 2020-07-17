@@ -73,6 +73,11 @@ Aircraft::Aircraft(const char *frame_str) :
     enum ap_var_type ptype;
     ahrs_orientation = (AP_Int8 *)AP_Param::find("AHRS_ORIENTATION", &ptype);
     terrain = reinterpret_cast<AP_Terrain *>(AP_Param::find_object("TERRAIN_"));
+
+    // init rangefinder array to -1 to signify no data
+    for (uint8_t i = 0; i < RANGEFINDER_MAX_INSTANCES; i++){
+        rangefinder_m[i] = -1.0f;
+    }
 }
 
 void Aircraft::set_start_location(const Location &start_loc, const float start_yaw)
@@ -351,6 +356,9 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
     // copy laser scanner results
     fdm.scanner.points = scanner.points;
     fdm.scanner.ranges = scanner.ranges;
+
+    // copy rangefinder
+    memcpy(fdm.rangefinder_m, rangefinder_m, sizeof(fdm.rangefinder_m));
 
     if (smoothing.enabled) {
         fdm.xAccel = smoothing.accel_body.x;
