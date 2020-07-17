@@ -12,6 +12,7 @@
 #include "SIM_Precland.h"
 #include "SIM_Sprayer.h"
 #include "SIM_ToneAlarm.h"
+#include <AP_RangeFinder/AP_RangeFinder.h>
 
 namespace SITL {
 
@@ -54,6 +55,8 @@ struct sitl_fdm {
         struct vector3f_array points;
         struct float_array ranges;
     } scanner;
+
+    float rangefinder_m[RANGEFINDER_MAX_INSTANCES];
 };
 
 // number of rc output channels
@@ -320,6 +323,10 @@ public:
         uint8_t num_leds[16];
         uint32_t send_counter;
     } led;
+
+    // get the rangefinder reading for the desired instance, returns -1 for no data
+    float get_rangefinder(uint8_t instance);
+
 };
 
 } // namespace SITL
