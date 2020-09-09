@@ -1226,6 +1226,23 @@ struct PACKED log_Arm_Disarm {
     uint16_t arm_checks;
 };
 
+struct PACKED log_PSC {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    float pos_target_x;
+    float pos_target_Y;
+    float position_x;
+    float position_y;
+    float vel_target_x;
+    float vel_target_y;
+    float velocity_x;
+    float velocity_y;
+    float accel_target_x;
+    float accel_target_y;
+    float accel_x;
+    float accel_y;
+};
+
 // FMT messages define all message formats other than FMT
 // UNIT messages define units which can be referenced by FMTU messages
 // FMTU messages associate types (e.g. centimeters/second/second) to FMT message fields
@@ -1311,6 +1328,22 @@ struct PACKED log_Arm_Disarm {
 #define ARSP_FMT "QffcffBBfB"
 #define ARSP_UNITS "snPOPP----"
 #define ARSP_MULTS "F00B00----"
+
+// @LoggerMessage: PSC
+// @Description: Position Control data
+// @Field: TimeUS: Time since system startup
+// @Field: TPX: Target position relative to origin, X-axis
+// @Field: TPY: Target position relative to origin, Y-axis
+// @Field: PX: Position relative to origin, X-axis
+// @Field: PY: Position relative to origin, Y-axis
+// @Field: TVX: Target velocity, X-axis
+// @Field: TVY: Target velocity, Y-axis
+// @Field: VX: Velocity, X-axis
+// @Field: VY: Velocity, Y-axis
+// @Field: TAX: Target acceleration, X-axis
+// @Field: TAY: Target acceleration, Y-axis
+// @Field: AX: Acceleration, X-axis
+// @Field: AY: Acceleration, Y-axis
 
 // messages for all boards
 #define LOG_BASE_STRUCTURES \
@@ -1608,8 +1641,9 @@ struct PACKED log_Arm_Disarm {
     { LOG_WHEELENCODER_MSG, sizeof(log_WheelEncoder), \
       "WENC",  "Qfbfb", "TimeUS,Dist0,Qual0,Dist1,Qual1", "sm-m-", "F0-0-" }, \
     { LOG_ADSB_MSG, sizeof(log_ADSB), \
-      "ADSB",  "QIiiiHHhH", "TimeUS,ICAO_address,Lat,Lng,Alt,Heading,Hor_vel,Ver_vel,Squark", "s-DUmhnn-", "F-GGCBCC-" }
-
+      "ADSB",  "QIiiiHHhH", "TimeUS,ICAO_address,Lat,Lng,Alt,Heading,Hor_vel,Ver_vel,Squark", "s-DUmhnn-", "F-GGCBCC-" }, \
+    { LOG_PSC_MSG, sizeof(log_PSC), \
+      "PSC", "Qffffffffffff", "TimeUS,TPX,TPY,PX,PY,TVX,TVY,VX,VY,TAX,TAY,AX,AY", "smmmmnnnnoooo", "F000000000000" }
 
 #define LOG_SBP_STRUCTURES \
     { LOG_MSG_SBPHEALTH, sizeof(log_SbpHealth), \
@@ -1800,6 +1834,7 @@ enum LogMessages : uint8_t {
     LOG_ARM_DISARM_MSG,
     LOG_OA_BENDYRULER_MSG,
     LOG_OA_DIJKSTRA_MSG,
+    LOG_PSC_MSG,
 
     _LOG_LAST_MSG_
 };
