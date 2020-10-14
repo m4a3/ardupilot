@@ -251,14 +251,7 @@ void AP_Button::run_aux_functions(bool force)
             state_actioned_mask &= ~value_mask;
         }
 
-        const RC_Channel::AuxSwitchPos pos = value ? RC_Channel::AuxSwitchPos::HIGH : RC_Channel::AuxSwitchPos::LOW;
-        // I wonder if we can do better here:
-#if !HAL_MINIMIZE_FEATURES
-        const char *str = rc_channel->string_for_aux_function(func);
-        if (str != nullptr) {
-            gcs().send_text(MAV_SEVERITY_INFO, "Button: executing (%s)", str);
-        }
-#endif
+        const RC_Channel::aux_switch_pos_t pos = value ? RC_Channel::aux_switch_pos_t::HIGH : RC_Channel::aux_switch_pos_t::LOW;
         rc_channel->do_aux_function(func, pos);
     }
 }
