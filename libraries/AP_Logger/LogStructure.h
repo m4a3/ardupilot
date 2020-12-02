@@ -1663,8 +1663,6 @@ struct PACKED log_PSCP {
       "VISO", "Qffffffff", "TimeUS,dt,AngDX,AngDY,AngDZ,PosDX,PosDY,PosDZ,conf", "ssrrrmmm-", "FF000000-" }, \
     { LOG_OPTFLOW_MSG, sizeof(log_Optflow), \
       "OF",   "QBffff",   "TimeUS,Qual,flowX,flowY,bodyX,bodyY", "s-EEEE", "F-0000" }, \
-    { LOG_WHEELENCODER_MSG, sizeof(log_WheelEncoder), \
-      "WENC",  "Qfbfb", "TimeUS,Dist0,Qual0,Dist1,Qual1", "sm-m-", "F0-0-" }, \
     { LOG_ADSB_MSG, sizeof(log_ADSB), \
       "ADSB",  "QIiiiHHhH", "TimeUS,ICAO_address,Lat,Lng,Alt,Heading,Hor_vel,Ver_vel,Squark", "s-DUmhnn-", "F-GGCBCC-" }, \
     { LOG_PSC_MSG, sizeof(log_PSC), \
@@ -1854,7 +1852,6 @@ enum LogMessages : uint8_t {
     LOG_PERFORMANCE_MSG,
     LOG_OPTFLOW_MSG,
     LOG_EVENT_MSG,
-    LOG_WHEELENCODER_MSG,
     LOG_MAV_MSG,
     LOG_ERROR_MSG,
     LOG_ADSB_MSG,
