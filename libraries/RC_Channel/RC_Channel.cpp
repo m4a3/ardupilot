@@ -39,7 +39,7 @@ extern const AP_HAL::HAL& hal;
 #include <AP_GPS/AP_GPS.h>
 #include <AC_Fence/AC_Fence.h>
 
-#define SWITCH_DEBOUNCE_TIME_MS  200
+#define SWITCH_DEBOUNCE_TIME_MS  500
 
 const AP_Param::GroupInfo RC_Channel::var_info[] = {
     // @Param: MIN
