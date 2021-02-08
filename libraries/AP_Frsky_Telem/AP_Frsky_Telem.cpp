@@ -655,39 +655,50 @@ void AP_Frsky_Telem::check_sensor_status_flags(void)
         // only one error is reported at a time (in order of preference). Same setup and displayed messages as Mission Planner.
         if ((_sensor_status_flags & MAV_SYS_STATUS_SENSOR_GPS) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "Bad GPS Health");
+            gcs:send_text(6, "Bad GPS Health")
             check_sensor_status_timer = now;
         } else if ((_sensor_status_flags & MAV_SYS_STATUS_SENSOR_3D_GYRO) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "Bad Gyro Health");
+            gcs:send_text(6, "Bad Gyro Health")
             check_sensor_status_timer = now;
         } else if ((_sensor_status_flags & MAV_SYS_STATUS_SENSOR_3D_ACCEL) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "Bad Accel Health");
+            gcs:send_text(6, "Bad Accel Health")
             check_sensor_status_timer = now;
         } else if ((_sensor_status_flags & MAV_SYS_STATUS_SENSOR_3D_MAG) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "Bad Compass Health");
+            gcs:send_text(6, "Bad Compass Health")
             check_sensor_status_timer = now;
         } else if ((_sensor_status_flags & MAV_SYS_STATUS_SENSOR_ABSOLUTE_PRESSURE) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "Bad Baro Health");
+            gcs:send_text(6, "Bad Baro Health")
             check_sensor_status_timer = now;
         } else if ((_sensor_status_flags & MAV_SYS_STATUS_SENSOR_LASER_POSITION) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "Bad LiDAR Health");
+            gcs:send_text(6, "Bad LiDAR Health")
             check_sensor_status_timer = now;
         } else if ((_sensor_status_flags & MAV_SYS_STATUS_SENSOR_OPTICAL_FLOW) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "Bad OptFlow Health");
+            gcs:send_text(6, "Bad OptFlow Health")
             check_sensor_status_timer = now;
         } else if ((_sensor_status_flags & MAV_SYS_STATUS_TERRAIN) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "Bad or No Terrain Data");
             check_sensor_status_timer = now;
         } else if ((_sensor_status_flags & MAV_SYS_STATUS_GEOFENCE) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "Geofence Breach");
+            gcs:send_text(6, "Geofence Breach")
             check_sensor_status_timer = now;
         } else if ((_sensor_status_flags & MAV_SYS_STATUS_AHRS) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "Bad AHRS");
+            gcs:send_text(6, "Bad AHRS")
             check_sensor_status_timer = now;
         } else if ((_sensor_status_flags & MAV_SYS_STATUS_SENSOR_RC_RECEIVER) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "No RC Receiver");
+            gcs:send_text(6, "No RC Receiver")
             check_sensor_status_timer = now;
         } else if ((_sensor_status_flags & MAV_SYS_STATUS_LOGGING) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "Bad Logging");
+            //gcs:send_text(6, "Bad Logging")
             check_sensor_status_timer = now;
         }
     }
