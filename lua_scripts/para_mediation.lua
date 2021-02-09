@@ -17,12 +17,12 @@ function update() -- this is the loop which periodically runs
   local status_kill, kills_engaged = pcall(kill_switch_engaged)
 
   -- send debug messages from the protected call functions to the gcs
-  if not status_chute then
-    gcs:send_text(6, "PM-LUA: " ..tostring(status_chute).."  "..tostring(parachute_armed))
-  end
-  if not status_kill then
-    gcs:send_text(6, "PM-LUA: "..tostring(status_kill).."  "..tostring(kills_engaged))
-  end
+  --if not status_chute then
+  --  gcs:send_text(6, "PM-LUA: " ..tostring(status_chute).."  "..tostring(parachute_armed))
+  --end
+  --if not status_kill then
+  --  gcs:send_text(6, "PM-LUA: "..tostring(status_kill).."  "..tostring(kills_engaged))
+  --end
 
   if parachute_armed and kills_engaged and status_chute and status_kill then
     -- if the chute is armed and the kill switches are engaged then launch and the functions to evaluate these have successfully run
@@ -105,7 +105,7 @@ function chute_armed()
     vect_distance = home_pos:get_distance_NED(current_pos):length()
 
     -- send home distance to the gcs from monitoring
-    gcs:send_text(6, "PM-LUA: Home_distance: "..vect_distance) --..", origin_distance: "..origin_distance)
+    --gcs:send_text(6, "PM-LUA: Home_distance: "..vect_distance) --..", origin_distance: "..origin_distance)
 
     if vect_distance > _disarm_radius then
       -- if the aircraft is outside the radius then return true 
