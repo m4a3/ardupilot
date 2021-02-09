@@ -67,8 +67,8 @@ function kill_switch_engaged()
     if chan7_continuous > _high_cycles then
       if chan7_continuous > 8 then
         chan7_continuous = 10 -- stops counter getting too large
+        return true
       end
-      return true
     else
       -- need continuous high signal for 1s to trigger
       return false
