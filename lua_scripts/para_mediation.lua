@@ -65,8 +65,8 @@ function kill_switch_engaged()
     -- if channel 7 is high then return true - kill switches engaged
     chan7_continuous = chan7_continuous + 1
     if chan7_continuous > _high_cycles then
-      if chan7_continuous == 10 then
-        chan7_continuous = 6 -- stops counter getting too large
+      if chan7_continuous > 8 then
+        chan7_continuous = 10 -- stops counter getting too large
         return true
       end
     else
