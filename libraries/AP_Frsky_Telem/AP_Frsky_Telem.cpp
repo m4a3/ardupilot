@@ -655,7 +655,7 @@ void AP_Frsky_Telem::check_sensor_status_flags(void)
         // only one error is reported at a time (in order of preference). Same setup and displayed messages as Mission Planner.
         if ((_sensor_status_flags & MAV_SYS_STATUS_SENSOR_GPS) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "Bad GPS Health");
-            gcs().send_text(MAV_SEVERITY_INFO, "Bad GPS Health";
+            gcs().send_text(MAV_SEVERITY_INFO, "Bad GPS Health)";
             check_sensor_status_timer = now;
         } else if ((_sensor_status_flags & MAV_SYS_STATUS_SENSOR_3D_GYRO) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "Bad Gyro Health");
