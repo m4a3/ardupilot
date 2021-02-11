@@ -45,6 +45,10 @@ bool ModeGuided::init(bool ignore_checks)
     return true;
 }
 
+bool ModeGuided::allows_weathervaning(void) const
+{
+    return (copter.g2.guided_options & (uint32_t)Options::AllowWeatherVaning);
+}
 
 // do_user_takeoff_start - initialises waypoint controller to implement take-off
 bool ModeGuided::do_user_takeoff_start(float final_alt_above_home)
@@ -446,6 +450,19 @@ void ModeGuided::pos_control_run()
         return;
     }
 
+    // if set and no pilot input for 3 sec weathervane copter into wind
+    if (allows_weathervaning()) {
+        float wvane_yaw_rate = 0.0f;
+        if (wp_nav->reached_wp_destination() &&
+            copter.g2.weathervane.get_yaw_rate_cds(wvane_yaw_rate, target_yaw_rate, wp_nav->get_roll(), wp_nav->get_pitch())) {
+            auto_yaw.set_rate(wvane_yaw_rate);
+
+        } else if (auto_yaw.mode() != AUTO_YAW_HOLD) {
+            // provided a pilot input hasn't caused auto yaw to be held, return to autoyaw behaviour
+            auto_yaw.set_mode_to_default(false);
+        }
+    }
+
     // set motors to full range
     motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
 
@@ -460,7 +477,7 @@ void ModeGuided::pos_control_run()
         // roll & pitch from waypoint controller, yaw rate from pilot
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(wp_nav->get_roll(), wp_nav->get_pitch(), target_yaw_rate);
     } else if (auto_yaw.mode() == AUTO_YAW_RATE) {
-        // roll & pitch from waypoint controller, yaw rate from mavlink command or mission item
+        // roll & pitch from waypoint controller, yaw rate from mavlink command, mission item, or weathervaning
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(wp_nav->get_roll(), wp_nav->get_pitch(), auto_yaw.rate_cds());
     } else {
         // roll, pitch from waypoint controller, yaw heading from GCS or auto_heading()
@@ -479,6 +496,22 @@ void ModeGuided::vel_control_run()
         target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
         if (!is_zero(target_yaw_rate)) {
             auto_yaw.set_mode(AUTO_YAW_HOLD);
+        }
+    }
+
+    // if set and no pilot input for 3 sec weathervane copter into wind
+    if (allows_weathervaning()) {
+        // force weathervane controller to relax on landing, incase min alt is not set
+        copter.g2.weathervane.set_relax(copter.ap.land_complete || copter.ap.land_complete_maybe);
+
+        float wvane_yaw_rate = 0.0f;
+        if (pos_control->get_desired_velocity().is_zero() &&
+            copter.g2.weathervane.get_yaw_rate_cds(wvane_yaw_rate, target_yaw_rate, wp_nav->get_roll(), wp_nav->get_pitch())) {
+            auto_yaw.set_rate(wvane_yaw_rate);
+
+        } else if (auto_yaw.mode() != AUTO_YAW_HOLD) {
+            // provided a pilot input hasn't caused auto yaw to be held, return to autoyaw behaviour
+            auto_yaw.set_mode_to_default(false);
         }
     }
 
@@ -512,7 +545,7 @@ void ModeGuided::vel_control_run()
         // roll & pitch from waypoint controller, yaw rate from pilot
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(pos_control->get_roll(), pos_control->get_pitch(), target_yaw_rate);
     } else if (auto_yaw.mode() == AUTO_YAW_RATE) {
-        // roll & pitch from velocity controller, yaw rate from mavlink command or mission item
+        // roll & pitch from waypoint controller, yaw rate from mavlink command, mission item, or weathervaning
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(pos_control->get_roll(), pos_control->get_pitch(), auto_yaw.rate_cds());
     } else {
         // roll, pitch from waypoint controller, yaw heading from GCS or auto_heading()
@@ -539,6 +572,22 @@ void ModeGuided::posvel_control_run()
     if (is_disarmed_or_landed()) {
         make_safe_spool_down();
         return;
+    }
+
+    // if set and no pilot input for 3 sec weathervane copter into wind
+    if (allows_weathervaning()) {
+        // force weathervane controller to relax on landing, incase min alt is not set
+        copter.g2.weathervane.set_relax(copter.ap.land_complete || copter.ap.land_complete_maybe);
+
+        float wvane_yaw_rate = 0.0f;
+        if (pos_control->get_desired_velocity().is_zero() &&
+            copter.g2.weathervane.get_yaw_rate_cds(wvane_yaw_rate, target_yaw_rate, wp_nav->get_roll(), wp_nav->get_pitch())) {
+            auto_yaw.set_rate(wvane_yaw_rate);
+
+        } else if (auto_yaw.mode() != AUTO_YAW_HOLD) {
+            // provided a pilot input hasn't caused auto yaw to be held, return to autoyaw behaviour
+            auto_yaw.set_mode_to_default(false);
+        }
     }
 
     // set motors to full range
@@ -577,7 +626,7 @@ void ModeGuided::posvel_control_run()
         // roll & pitch from waypoint controller, yaw rate from pilot
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(pos_control->get_roll(), pos_control->get_pitch(), target_yaw_rate);
     } else if (auto_yaw.mode() == AUTO_YAW_RATE) {
-        // roll & pitch from position-velocity controller, yaw rate from mavlink command or mission item
+        // roll & pitch from waypoint controller, yaw rate from mavlink command, mission item, or weathervaning
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(pos_control->get_roll(), pos_control->get_pitch(), auto_yaw.rate_cds());
     } else {
         // roll, pitch from waypoint controller, yaw heading from GCS or auto_heading()
