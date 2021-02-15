@@ -22,6 +22,7 @@
 #include "AP_GPS_SBF.h"
 #include <GCS_MAVLink/GCS.h>
 #include <stdio.h>
+#include <ctype.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -51,6 +52,8 @@ do {                                            \
                        INVALIDCONFIG | \
                        OUTOFGEOFENCE)
 
+constexpr const char *AP_GPS_SBF::portIdentifiers[];
+constexpr const char* AP_GPS_SBF::_initialisation_blob[];
 
 AP_GPS_SBF::AP_GPS_SBF(AP_GPS &_gps, AP_GPS::GPS_State &_state,
                        AP_HAL::UARTDriver *_port) :
@@ -58,11 +61,13 @@ AP_GPS_SBF::AP_GPS_SBF(AP_GPS &_gps, AP_GPS::GPS_State &_state,
 {
     sbf_msg.sbf_state = sbf_msg_parser_t::PREAMBLE1;
 
-    port->write((const uint8_t*)_port_enable, strlen(_port_enable));
     _config_last_ack_time = AP_HAL::millis();
 
     // if we ever parse RTK observations it will always be of type NED, so set it once
     state.rtk_baseline_coords_type = RTK_BASELINE_COORDINATE_SYSTEM_NED;
+    if (driver_options() & DriverOptions::SBF_UseBaseForYaw) {
+        state.gps_yaw_configured = true;
+    }
 }
 
 AP_GPS_SBF::~AP_GPS_SBF (void) {
@@ -85,12 +90,12 @@ AP_GPS_SBF::read(void)
         if (_init_blob_index < ARRAY_SIZE(_initialisation_blob)) {
             uint32_t now = AP_HAL::millis();
             if (now > _init_blob_time) {
-                if (now > _config_last_ack_time + 2500) {
+                if (now > _config_last_ack_time + 2000) {
                     // try to enable input on the GPS port if we have not made progress on configuring it
                     Debug("SBF Sending port enable");
                     port->write((const uint8_t*)_port_enable, strlen(_port_enable));
                     _config_last_ack_time = now;
-                } else {
+                } else if (readyForCommand) {
                     char *init_str = nullptr;
                     if (!_validated_initial_sso) {
                         if (_initial_sso == nullptr) {
@@ -109,9 +114,9 @@ AP_GPS_SBF::read(void)
                     if (init_str != nullptr) {
                         Debug("SBF sending init string: %s", init_str);
                         port->write((const uint8_t*)init_str, strlen(init_str));
+                        readyForCommand = false;
                     }
                 }
-                _init_blob_time = now + 1000;
             }
         } else if (gps._raw_data == 2) { // only manage disarm/rearms when the user opts into it
             if (hal.util->get_soft_armed()) {
@@ -152,6 +157,33 @@ AP_GPS_SBF::parse(uint8_t temp)
             if (temp == SBF_PREAMBLE1) {
                 sbf_msg.sbf_state = sbf_msg_parser_t::PREAMBLE2;
                 sbf_msg.read = 0;
+            } else {
+                // attempt to detect command prompt
+                portIdentifier[portLength++] = (char)temp;
+                bool foundPossiblePort = false;
+                for (const char *portId : portIdentifiers) {
+                    if (strncmp(portId, portIdentifier, MIN(portLength, 3)) == 0) {
+                        // we found one of the COM/USB/IP related ports
+                        if (portLength == 4) {
+                            // validate that we have an ascii number
+                            if (isdigit((char)temp)) {
+                                foundPossiblePort = true;
+                                break;
+                            }
+                        } else if (portLength >= sizeof(portIdentifier)) {
+                            if ((char)temp == '>') {
+                                readyForCommand = true;
+                                Debug("SBF: Ready for command");
+                            }
+                        } else {
+                            foundPossiblePort = true;
+                        }
+                        break;
+                    }
+                }
+                if (!foundPossiblePort) {
+                    portLength = 0;
+                }
             }
             break;
         case sbf_msg_parser_t::PREAMBLE2:
@@ -420,6 +452,7 @@ AP_GPS_SBF::process_message(void)
 
         // just breakout any consts we need for Do Not Use (DNU) reasons
         constexpr double doubleDNU = -2e-10;
+        constexpr uint16_t uint16DNU = 65535;
 
         check_new_itow(temp.TOW, sbf_msg.length);
 
@@ -436,10 +469,30 @@ AP_GPS_SBF::process_message(void)
 
         state.rtk_age_ms = (temp.info.CorrAge != 65535) ? ((uint32_t)temp.info.CorrAge) * 10 : 0;
 
-        // copy the position as long as the data isn't DNU
-        state.rtk_baseline_y_mm = (temp.info.DeltaEast != doubleDNU) ?  temp.info.DeltaEast * 1e3 : 0;
-        state.rtk_baseline_x_mm = (temp.info.DeltaNorth != doubleDNU) ? temp.info.DeltaNorth * 1e3 : 0;
-        state.rtk_baseline_z_mm = (temp.info.DeltaUp != doubleDNU) ? temp.info.DeltaUp * -1e3 : 0;
+        // copy the position as long as the data isn't DNU, we require NED, and heading before accepting any of it
+        if ((temp.info.DeltaEast != doubleDNU) && (temp.info.DeltaNorth != doubleDNU) && (temp.info.DeltaUp != doubleDNU) &&
+            (temp.info.Azimuth != uint16DNU)) {
+
+            state.rtk_baseline_y_mm = temp.info.DeltaEast * 1e3;
+            state.rtk_baseline_x_mm = temp.info.DeltaNorth * 1e3;
+            state.rtk_baseline_z_mm = temp.info.DeltaUp * -1e3;
+
+#if GPS_MOVING_BASELINE
+            // copy the baseline data as a yaw source
+            if (driver_options() & DriverOptions::SBF_UseBaseForYaw) {
+                calculate_moving_base_yaw(temp.info.Azimuth * 0.01f + 180.0f,
+                                          Vector3f(temp.info.DeltaNorth, temp.info.DeltaEast, temp.info.DeltaUp).length(),
+                                          -temp.info.DeltaUp);
+            }
+#endif // GPS_MOVING_BASELINE
+
+        } else {
+            state.rtk_baseline_y_mm = 0;
+            state.rtk_baseline_x_mm = 0;
+            state.rtk_baseline_z_mm = 0;
+            state.have_gps_yaw = false;
+        }
+
 #pragma GCC diagnostic pop
         break;
     }

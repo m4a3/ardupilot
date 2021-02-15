@@ -165,7 +165,7 @@ bool AC_PolyFence_loader::read_latlon_from_storage(uint16_t &read_offset, Vector
 
 // load boundary point from eeprom, returns true on successful load
 // only used for converting from old storage to new storage
-bool AC_PolyFence_loader::load_point_from_eeprom(uint16_t i, Vector2l& point)
+bool AC_PolyFence_loader::load_point_from_eeprom(uint16_t i, Vector2l& point) const
 {
     // sanity check index
     if (i >= max_items()) {
@@ -617,12 +617,12 @@ bool AC_PolyFence_loader::load_from_eeprom()
         return false;
     }
 
-    _load_attempted = true;
-
     // find indexes of each fence:
-    if (!get_loaded_fence_semaphore().take(1)) {
+    if (!get_loaded_fence_semaphore().take_nonblocking()) {
         return false;
     }
+
+    _load_attempted = true;
 
     unload();
 

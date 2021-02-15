@@ -145,7 +145,7 @@ void Plane::geofence_disable_and_send_error_msg(const char *errorMsg)
  * return true if a geo-fence has been uploaded and
  * FENCE_ACTION is 1 (not necessarily enabled)
  */
-bool Plane::geofence_present(void)
+bool Plane::geofence_present(void) const
 {
     //require at least a return point and a triangle
     //to define a geofence area:
@@ -513,6 +513,23 @@ bool Plane::geofence_breached(void)
     return geofence_state ? geofence_state->fence_triggered : false;
 }
 
+void Plane::disable_fence_for_landing(void)
+{
+    if (g.fence_autoenable == FenceAutoEnable::Auto) {
+        if (!geofence_set_enabled(false)) {
+            gcs().send_text(MAV_SEVERITY_NOTICE, "Disable fence failed (auto-disable)");
+        } else {
+            gcs().send_text(MAV_SEVERITY_NOTICE, "Fence disabled (auto-disable)");
+        }
+    } else if (g.fence_autoenable == FenceAutoEnable::AutoDisableFloorOnly) {
+        if (!geofence_set_floor_enabled(false)) {
+            gcs().send_text(MAV_SEVERITY_NOTICE, "Disable fence floor failed (auto-disable)");
+        } else {
+            gcs().send_text(MAV_SEVERITY_NOTICE, "Fence floor disabled (auto-disable)");
+        }
+    }
+}
+
 
 #else // GEOFENCE_ENABLED
 
@@ -540,6 +557,10 @@ bool Plane::geofence_set_floor_enabled(bool floor_enable) {
 bool Plane::geofence_breached(void)
 {
     return false;
+}
+
+void Plane::disable_fence_for_landing(void)
+{
 }
 
 #endif // GEOFENCE_ENABLED

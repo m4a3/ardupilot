@@ -26,7 +26,7 @@
 #include <AP_CANManager/AP_CANManager.h>
 #include <AP_Button/AP_Button.h>
 #include <AP_GPS/AP_GPS.h>
-#include <AP_Generator/AP_Generator_RichenPower.h>
+#include <AP_Generator/AP_Generator.h>
 #include <AP_Logger/AP_Logger.h>
 #include <AP_Notify/AP_Notify.h>                    // Notify library
 #include <AP_Param/AP_Param.h>
@@ -43,6 +43,8 @@
 #include <AP_VisualOdom/AP_VisualOdom.h>
 #include <AP_RCTelemetry/AP_VideoTX.h>
 #include <AP_MSP/AP_MSP.h>
+#include <AP_Frsky_Telem/AP_Frsky_Parameters.h>
+#include <AP_ExternalAHRS/AP_ExternalAHRS.h>
 
 class AP_Vehicle : public AP_HAL::HAL::Callbacks {
 
@@ -74,15 +76,20 @@ public:
     // HAL::Callbacks implementation.
     void loop() override final;
 
-    bool virtual set_mode(const uint8_t new_mode, const ModeReason reason) = 0;
-    uint8_t virtual get_mode() const = 0;
+    // set_mode *must* set control_mode_reason
+    virtual bool set_mode(const uint8_t new_mode, const ModeReason reason) = 0;
+    virtual uint8_t get_mode() const = 0;
+
+    ModeReason get_control_mode_reason() const {
+        return control_mode_reason;
+    }
 
     /*
       common parameters for fixed wing aircraft
      */
     struct FixedWing {
         AP_Int8 throttle_min;
-        AP_Int8 throttle_max;	
+        AP_Int8 throttle_max;
         AP_Int8 throttle_slewrate;
         AP_Int8 throttle_cruise;
         AP_Int8 takeoff_throttle_max;
@@ -93,7 +100,7 @@ public:
         AP_Int8  crash_detection_enable;
         AP_Int16 roll_limit_cd;
         AP_Int16 pitch_limit_max_cd;
-        AP_Int16 pitch_limit_min_cd;        
+        AP_Int16 pitch_limit_min_cd;
         AP_Int8  autotune_level;
         AP_Int8  stall_prevention;
         AP_Int16 loiter_radius;
@@ -213,6 +220,28 @@ public:
     // and flashing LEDs as appropriate
     void reboot(bool hold_in_bootloader);
 
+    /*
+      get the distance to next wp in meters
+      return false if failed or n/a
+     */
+    virtual bool get_wp_distance_m(float &distance) const { return false; }
+
+    /*
+      get the current wp bearing in degrees
+      return false if failed or n/a
+     */
+    virtual bool get_wp_bearing_deg(float &bearing) const { return false; }
+
+    /*
+      get the current wp crosstrack error in meters
+      return false if failed or n/a
+     */
+    virtual bool get_wp_crosstrack_error_m(float &xtrack_error) const { return false; }
+
+#if HAL_WITH_FRSKY_TELEM_BIDIRECTIONAL
+    AP_Frsky_Parameters frsky_parameters;
+#endif
+
 protected:
 
     virtual void init_ardupilot() = 0;
@@ -283,11 +312,21 @@ protected:
 #endif
 
 #if GENERATOR_ENABLED
-    AP_Generator_RichenPower generator;
+    AP_Generator generator;
+#endif
+
+#if HAL_EXTERNAL_AHRS_ENABLED
+    AP_ExternalAHRS externalAHRS;
 #endif
 
     static const struct AP_Param::GroupInfo var_info[];
     static const struct AP_Scheduler::Task scheduler_tasks[];
+
+#if OSD_ENABLED
+    void publish_osd_info();
+#endif
+
+    ModeReason control_mode_reason = ModeReason::UNKNOWN;
 
 private:
 
@@ -302,6 +341,8 @@ private:
     uint32_t _last_flying_ms;   // time when likely_flying last went true
 
     static AP_Vehicle *_singleton;
+
+    bool done_safety_init;
 };
 
 namespace AP {

@@ -78,7 +78,7 @@ public:
     struct PACKED Change_Speed_Command {
         uint8_t speed_type;     // 0=airspeed, 1=ground speed
         float target_ms;        // target speed in m/s, -1 means no change
-        float throttle_pct;     // throttle as a percentage (i.e. 0 ~ 100), -1 means no change
+        float throttle_pct;     // throttle as a percentage (i.e. 1 ~ 100), 0 means no change
     };
 
     // set relay command structure
@@ -510,7 +510,7 @@ public:
     // find the nearest landing sequence starting point (DO_LAND_START) and
     // return its index.  Returns 0 if no appropriate DO_LAND_START point can
     // be found.
-    uint16_t get_landing_sequence_start();
+    uint16_t get_landing_sequence_start() const;
 
     // find the nearest landing sequence starting point (DO_LAND_START) and
     // switch to that mission item.  Returns false if no DO_LAND_START
@@ -566,7 +566,7 @@ public:
     static const struct AP_Param::GroupInfo var_info[];
 
     // allow lua to get/set any WP items in any order in a mavlink-ish kinda way.
-    bool get_item(uint16_t index, mavlink_mission_item_int_t& result) ;
+    bool get_item(uint16_t index, mavlink_mission_item_int_t& result) const ;
     bool set_item(uint16_t index, mavlink_mission_item_int_t& source) ;
 
 private:

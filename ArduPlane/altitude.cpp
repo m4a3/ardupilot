@@ -137,7 +137,7 @@ void Plane::setup_glide_slope(void)
 /*
   return RTL altitude as AMSL altitude
  */
-int32_t Plane::get_RTL_altitude()
+int32_t Plane::get_RTL_altitude() const
 {
     if (g.RTL_altitude_cm < 0) {
         return current_loc.alt;
@@ -459,7 +459,7 @@ bool Plane::above_location_current(const Location &loc)
   modify a destination to be setup for terrain following if
   TERRAIN_FOLLOW is enabled
  */
-void Plane::setup_terrain_target_alt(Location &loc)
+void Plane::setup_terrain_target_alt(Location &loc) const
 {
 #if AP_TERRAIN_AVAILABLE
     if (g.terrain_follow) {
@@ -702,7 +702,9 @@ void Plane::rangefinder_height_update(void)
         if (now - rangefinder_state.last_correction_time_ms > 5000) {
             rangefinder_state.correction = correction;
             rangefinder_state.initial_correction = correction;
-            landing.set_initial_slope();
+            if (g.rangefinder_landing) {
+                landing.set_initial_slope();
+            }
             rangefinder_state.last_correction_time_ms = now;
         } else {
             rangefinder_state.correction = 0.8f*rangefinder_state.correction + 0.2f*correction;

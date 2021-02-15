@@ -532,7 +532,7 @@ bool AP_Mission::set_item(uint16_t index, mavlink_mission_item_int_t& src_packet
     return AP_Mission::replace_cmd( index, cmd);
 }
 
-bool AP_Mission::get_item(uint16_t index, mavlink_mission_item_int_t& ret_packet)
+bool AP_Mission::get_item(uint16_t index, mavlink_mission_item_int_t& ret_packet) const
 {
     // setting ret_packet.command = -1  and/or returning false
     //  means it contains invalid data after it leaves here.
@@ -946,7 +946,7 @@ MAV_MISSION_RESULT AP_Mission::mavlink_int_to_mission_cmd(const mavlink_mission_
     case MAV_CMD_DO_CHANGE_SPEED:                       // MAV ID: 178
         cmd.content.speed.speed_type = packet.param1;   // 0 = airspeed, 1 = ground speed
         cmd.content.speed.target_ms = packet.param2;    // target speed in m/s
-        cmd.content.speed.throttle_pct = packet.param3; // throttle as a percentage from 0 ~ 100%
+        cmd.content.speed.throttle_pct = packet.param3; // throttle as a percentage from 1 ~ 100%
         break;
 
     case MAV_CMD_DO_SET_HOME:
@@ -1386,7 +1386,7 @@ bool AP_Mission::mission_cmd_to_mavlink_int(const AP_Mission::Mission_Command& c
     case MAV_CMD_DO_CHANGE_SPEED:                       // MAV ID: 178
         packet.param1 = cmd.content.speed.speed_type;   // 0 = airspeed, 1 = ground speed
         packet.param2 = cmd.content.speed.target_ms;    // speed in m/s
-        packet.param3 = cmd.content.speed.throttle_pct; // throttle as a percentage from 0 ~ 100%
+        packet.param3 = cmd.content.speed.throttle_pct; // throttle as a percentage from 1 ~ 100%
         break;
 
     case MAV_CMD_DO_SET_HOME:                           // MAV ID: 179
@@ -1915,7 +1915,7 @@ uint16_t AP_Mission::num_commands_max(void) const
 // find the nearest landing sequence starting point (DO_LAND_START) and
 // return its index.  Returns 0 if no appropriate DO_LAND_START point can
 // be found.
-uint16_t AP_Mission::get_landing_sequence_start()
+uint16_t AP_Mission::get_landing_sequence_start() const
 {
     struct Location current_loc;
 
