@@ -683,7 +683,7 @@ void AP_Frsky_Telem::check_sensor_status_flags(void)
             check_sensor_status_timer = now;
         } else if ((_sensor_status_flags & MAV_SYS_STATUS_TERRAIN) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "Bad or No Terrain Data");
-            //gcs().send_text(MAV_SEVERITY_INFO, "Bad or No Terrain Data");
+            gcs().send_text(MAV_SEVERITY_INFO, "Bad or No Terrain Data");
             check_sensor_status_timer = now;
         } else if ((_sensor_status_flags & MAV_SYS_STATUS_GEOFENCE) > 0) {
             queue_message(MAV_SEVERITY_CRITICAL, "Geofence Breach");
