@@ -53,9 +53,6 @@ bool ModeAuto::init(bool ignore_checks)
             waiting_for_origin = true;
         }
 
-        // set max yaw rate in weather vane controller
-        copter.g2.weathervane.set_max_yaw_rate(attitude_control->get_yaw_rate_max());
-
         return true;
     } else {
         return false;
