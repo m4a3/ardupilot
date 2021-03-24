@@ -7,6 +7,7 @@
 #include <AP_Math/AP_Math.h>
 #include <GCS_MAVLink/GCS.h>
 #include <AP_Terrain/AP_Terrain.h>
+#include <AP_Logger/AP_Logger.h>
 
 const AP_Param::GroupInfo AC_WeatherVane::var_info[] = {
 
@@ -74,12 +75,12 @@ bool AC_WeatherVane::get_yaw_rate_cds(float& yaw_rate, const int16_t pilot_yaw, 
     }
 
     // Calculate new yaw rate
-    float output = fabsf(roll_cdeg) * _gain;
+    float output = fabsf((float)roll_cdeg) * _gain.get();
 
     // For nose in only direction, we add nose up pitch contribution to maintain a 
     // consistant yaw rate when the vehicle has its tail to the wind.
     if (pitch_cdeg > 0 && get_direction() == Direction::NOSE_IN) {
-        output += pitch_cdeg * _gain;
+        output += (float)pitch_cdeg * _gain.get();
     }
 
     /*
@@ -113,12 +114,16 @@ bool AC_WeatherVane::get_yaw_rate_cds(float& yaw_rate, const int16_t pilot_yaw, 
     // Slew output
     last_output = 0.98f * last_output + 0.02f * output;
 
-    // Limit yaw rate if limits are set
-    if (!is_zero(yaw_rate_max_deg_s)) {
-        last_output = constrain_float(last_output, -yaw_rate_max_deg_s, yaw_rate_max_deg_s);
-    }
-
     yaw_rate = last_output;
+
+    //Write to data flash log
+    AP::logger().Write("WVAN",
+                       "TimeUS,yaw,pit,rol",
+                         "Qfff",
+                        AP_HAL::micros64(),
+                        (double)yaw_rate,
+                        (double)pitch_cdeg,
+                        (double)roll_cdeg);
 
     return true;
 }

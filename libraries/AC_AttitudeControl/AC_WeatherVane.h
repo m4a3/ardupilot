@@ -17,8 +17,6 @@ class AC_WeatherVane {
         // Use to relax weather vaning on landing.  Must be persistantly called before calls to get_weathervane_yaw_rate_cds().
         void set_relax(bool relax) { should_relax = relax; }
 
-        void set_max_yaw_rate(float rate_max) { yaw_rate_max_deg_s = rate_max; }
-
         static AC_WeatherVane* get_singleton();
 
         static const struct AP_Param::GroupInfo var_info[];
