@@ -38,6 +38,7 @@
 #include <AP_VisualOdom/AP_VisualOdom.h>
 #include <AP_OpticalFlow/OpticalFlow.h>
 #include <AP_Baro/AP_Baro.h>
+#include <AP_Parachute/AP_Parachute.h>
 
 #include <stdio.h>
 
@@ -3042,6 +3043,19 @@ MAV_RESULT GCS_MAVLINK::handle_fixed_mag_cal_yaw(const mavlink_command_long_t &p
                                      packet.param4);
 }
 
+MAV_RESULT GCS_MAVLINK::handle_user_cmd(const mavlink_command_long_t &packet)
+{
+#if HAL_PARACHUTE_ENABLED
+    AP_Parachute *parachute = AP::parachute();
+    if (parachute == nullptr) {
+        return MAV_RESULT_UNSUPPORTED;
+    }
+    return parachute->handle_cmd(packet);
+#else
+    return MAV_RESULT_UNSUPPORTED;
+#endif // HAL_PARACHUTE_ENABLED
+}
+
 /*
   handle messages which don't require vehicle specific data
  */
@@ -3776,7 +3790,11 @@ MAV_RESULT GCS_MAVLINK::handle_command_long_packet(const mavlink_command_long_t 
     case MAV_CMD_FIXED_MAG_CAL_YAW:
         result = handle_fixed_mag_cal_yaw(packet);
         break;
-        
+
+    case MAV_CMD_USER_1:
+        result = handle_user_cmd(packet);
+        break;
+
     default:
         result = MAV_RESULT_UNSUPPORTED;
         break;
