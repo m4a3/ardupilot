@@ -14,7 +14,7 @@
  */
 #pragma once
 
-#include "AP_RangeFinder_Backend.h"
+#include "RangeFinder_Backend.h"
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 

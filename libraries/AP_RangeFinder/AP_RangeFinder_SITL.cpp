@@ -38,7 +38,7 @@ void AP_RangeFinder_SITL::update(void)
 
     // negative distance means nothing is connected
     if (is_negative(dist)) {
-        state.status = RangeFinder::Status::NoData;
+        state.status = RangeFinder::RangeFinder_NoData;
         return;
     }
 

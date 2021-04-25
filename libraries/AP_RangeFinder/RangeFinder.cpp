@@ -494,7 +494,7 @@ void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
         }
         break;
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-    case Type::SITL:
+    case RangeFinder_TYPE_SITL:
         drivers[instance] = new AP_RangeFinder_SITL(state[instance], params[instance], instance);
         break;
 #endif
