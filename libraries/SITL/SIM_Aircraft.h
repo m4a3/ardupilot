@@ -30,6 +30,7 @@
 #include "SIM_Precland.h"
 #include "SIM_Buzzer.h"
 #include <Filter/Filter.h>
+#include "SIM_JSON_Master.h"
 
 namespace SITL {
 
