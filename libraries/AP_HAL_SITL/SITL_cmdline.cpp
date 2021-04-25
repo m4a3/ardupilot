@@ -94,6 +94,7 @@ void SITL_State::_usage(void)
            "\t--sim-port-in PORT       set port num for simulator in\n"
            "\t--sim-port-out PORT      set port num for simulator out\n"
            "\t--irlock-port PORT       set port num for irlock\n"
+           "\t--slave number           set the number of JSON slaves\n"
         );
 }
 
@@ -212,6 +213,7 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
         CMDLINE_SIM_PORT_IN,
         CMDLINE_SIM_PORT_OUT,
         CMDLINE_IRLOCK_PORT,
+        CMDLINE_SLAVE,
     };
 
     const struct GetOptLong::option options[] = {
@@ -247,6 +249,7 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
         {"sim-port-in",     true,   0, CMDLINE_SIM_PORT_IN},
         {"sim-port-out",    true,   0, CMDLINE_SIM_PORT_OUT},
         {"irlock-port",     true,   0, CMDLINE_IRLOCK_PORT},
+        {"slave",           true,   0, CMDLINE_SLAVE},
         {0, false, 0, 0}
     };
 
@@ -365,6 +368,13 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
         case CMDLINE_IRLOCK_PORT:
             _irlock_port = atoi(gopt.optarg);
             break;
+        case CMDLINE_SLAVE: {
+            const int32_t slaves = atoi(gopt.optarg);
+            if (slaves > 0) {
+                ride_along = new SITL::JSON_Master(slaves);
+            }
+            break;
+        }
         default:
             _usage();
             exit(1);
