@@ -44,7 +44,6 @@ private:
         socket_list *next;
     } _list;
 
-    const char *_ip = "127.0.0.1";
 };
 
 }

@@ -24,11 +24,9 @@ using namespace SITL;
 JSON_Master::JSON_Master(const int32_t &num_slaves)
 {
     socket_list *list = &_list;
-    for (uint8_t i = 1; i <= num_slaves; i++) {
+    uint8_t i = 1;
+    while (true) {
         // init each socket and instance
-        if (list == nullptr) {
-            list = new socket_list;
-        }
         list->instance = i;
 
         list->sock_in.set_blocking(false);
@@ -39,7 +37,15 @@ JSON_Master::JSON_Master(const int32_t &num_slaves)
 
         uint16_t port = 9002 + 10 * i;
         list->sock_in.bind("127.0.0.1", port);
-        printf("Slave %u: listening on %u\n", i, port);
+        printf("Slave %u: listening on %u\n", list->instance, port);
+
+        if (i < num_slaves) {
+            i++;
+            list->next = new socket_list;
+            list = list->next;
+            continue;
+        }
+        break;
     }
 }
 
@@ -72,11 +78,15 @@ void JSON_Master::receve(struct sitl_input &input)
         if (!list->connected) {
             // connect back to the last addres for send
             uint16_t port;
+            const char *_ip = nullptr;
             list->sock_in.last_recv_address(_ip, port);
-            list->sock_out.connect(_ip, port);
-            list->connected = true;
-            printf("Slave %u connected to %s:%u\n", list->instance, _ip, port);
+            list->connected = list->sock_out.connect(_ip, port);
+            if (list->connected) {
+                printf("Slave %u connected to %s:%u\n", list->instance, _ip, port);
+            }
         }
+
+        const bool use_servos = list->instance == master_instance;
 
 // @LoggerMessage: SLV1
 // @Description: Log data received from JSON simulator 1
@@ -84,15 +94,17 @@ void JSON_Master::receve(struct sitl_input &input)
 // @Field: Instance: Slave instance
 // @Field: frame_rate: Slave instance's desired frame rate
 // @Field: frame_count: Slave instance's current frame count
-        AP::logger().Write("SLV1", "TimeUS,Instance,magic,frame_rate,frame_count",
-                       "s#---",
-                       "F????",
-                       "QBHHI",
+// @Field: active: 1 if the servo outputs are being used from this instance
+        AP::logger().Write("SLV1", "TimeUS,Instance,magic,frame_rate,frame_count,active",
+                       "s#----",
+                       "F?????",
+                       "QBHHIB",
                        AP_HAL::micros64(),
                        list->instance,
                        buffer.magic,
                        buffer.frame_rate,
-                       buffer.frame_count);
+                       buffer.frame_count,
+                       use_servos);
 
 // @LoggerMessage: SLV2
 // @Description: Log data received from JSON simulator 2
@@ -147,7 +159,7 @@ void JSON_Master::send(const struct sitl_fdm &output, const Vector3f &position)
     // message is the same to all slaves
     char *send_buffer = nullptr;
     int length = asprintf(&send_buffer,"\n{\"timestamp\":%f,\"imu\":{\"gyro\":[%f,%f,%f],\"accel_body\":[%f,%f,%f]},\"position\":[%f,%f,%f],\"quaternion\":[%f,%f,%f,%f],\"velocity\":[%f,%f,%f],\"no_time_sync\":1}\n",
-                            output.timestamp_us * 10e-6,
+                            output.timestamp_us * 1e-6,
                             radians(output.rollRate), radians(output.pitchRate), radians(output.yawRate),
                             output.xAccel, output.yAccel, output.zAccel,
                             position.x, position.y, position.z,
