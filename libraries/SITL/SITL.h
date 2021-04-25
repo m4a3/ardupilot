@@ -336,6 +336,9 @@ public:
     // get the apparent wind speed and direction as set by external physics backend
     float get_apparent_wind_dir(){return state.wind_vane_apparent.direction;}
     float get_apparent_wind_spd(){return state.wind_vane_apparent.speed;}
+
+    AP_Int8 ride_along_master;
+
 };
 
 } // namespace SITL

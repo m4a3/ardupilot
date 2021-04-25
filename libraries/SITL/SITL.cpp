@@ -215,6 +215,11 @@ const AP_Param::GroupInfo SITL::var_info3[] = {
 
     AP_GROUPINFO("RATE_HZ",  22, SITL,  loop_rate_hz, 1200),
 
+    // @Param: JSON_MASTER
+    // @DisplayName: JSON master instance
+    // @Description: the instance number to  take servos from
+    AP_GROUPINFO("JSON_MASTER",     26, SITL, ride_along_master, 0),
+
     AP_GROUPEND
 
 };
