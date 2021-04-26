@@ -919,6 +919,8 @@ private:
     void publish_osd_info();
 #endif
 
+    bool get_standby() const override { return standby_active; }
+
     Mode *flightmode;
 #if MODE_ACRO_ENABLED == ENABLED
 #if FRAME_CONFIG == HELI_FRAME
