@@ -107,6 +107,9 @@ public:
         AP_Int16 angle_max;
     };
 
+    // get standby status
+    virtual bool get_standby() const { return false; }
+
 protected:
 
     // board specific config
