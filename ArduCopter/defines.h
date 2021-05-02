@@ -19,6 +19,8 @@ enum autopilot_yaw_mode {
     AUTO_YAW_LOOK_AHEAD =       4,  // point in the direction the copter is moving
     AUTO_YAW_RESETTOARMEDYAW =  5,  // point towards heading at time motors were armed
     AUTO_YAW_RATE =             6,  // turn at a specified rate (held in auto_yaw_rate)
+    // will be AUTO_YAW_CIRCLE
+    AUTO_YAW_WEATHERVANE =      8,  // yaw into wind
 };
 
 // Frame types
