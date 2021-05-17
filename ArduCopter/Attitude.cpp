@@ -40,7 +40,7 @@ void Copter::update_throttle_hover()
 {
 #if FRAME_CONFIG != HELI_FRAME
     // if not armed or landed exit
-    if (!motors->armed() || ap.land_complete) {
+    if (!motors->armed() || ap.land_complete || standby_active) {
         return;
     }
 
