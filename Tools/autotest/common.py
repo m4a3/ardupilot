@@ -839,7 +839,7 @@ class AutoTest(ABC):
     def load_sample_mission(self):
         self.load_mission(self.sample_mission_filename())
 
-    def load_mission(self, filename):
+    def load_mission(self, filename, assert_same=True):
         """Load a mission from a file to flight controller."""
         self.progress("Loading mission (%s)" % filename)
         path = os.path.join(self.mission_directory(), filename)
@@ -875,7 +875,8 @@ class AutoTest(ABC):
             # that means the MAVProxy log files are not reltopdir!
             saved_filepath = self.mavproxy.match.group(2)
             saved_filepath = saved_filepath.rstrip()
-            self.assert_mission_files_same(path, saved_filepath)
+            if assert_same:
+                self.assert_mission_files_same(path, saved_filepath)
             break
         self.mavproxy.send('wp status\n')
         self.mavproxy.expect('Have (\d+) of (\d+)')

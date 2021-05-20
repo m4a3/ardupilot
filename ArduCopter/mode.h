@@ -199,6 +199,8 @@ public:
                            int8_t direction,
                            bool relative_angle);
 
+        void update_weathervane(const int16_t pilot_yaw, const int16_t roll_cdeg, const int16_t pitch_cdeg);
+
     private:
 
         float look_ahead_yaw();
@@ -228,6 +230,7 @@ public:
         // used to reduce update rate to 100hz:
         uint8_t roi_yaw_counter;
 
+        autopilot_yaw_mode _last_mode;
     };
     static AutoYaw auto_yaw;
 
@@ -387,7 +390,8 @@ private:
         AllowArming                        = (1 << 0U),
         AllowTakeOffWithoutRaisingThrottle = (1 << 1U),
         IgnorePilotYaw                     = (1 << 2U),
-        AllowWeatherVaning                 = (1 << 3U)
+        // 3rd bit available
+        AllowWeatherVaning                 = (1 << 4U) // set as 4th bit to mirror GUID_OPTION
     };
 
     bool use_pilot_yaw(void) const;
@@ -815,8 +819,9 @@ private:
     enum class Options : int32_t {
         AllowArmingFromTX   = (1U << 0),
         // this bit is still available, pilot yaw was mapped to bit 2 for symmetry with auto
-        IgnorePilotYaw      = (1U << 2),
-        AllowWeatherVaning  = (1U << 3)
+        IgnorePilotYaw    = (1U << 2),
+        // Not currently used, will be SetAttitudeTarget_ThrustAsThrust
+        AllowWeatherVaning = (1U << 4)
     };
 
     void pos_control_start();

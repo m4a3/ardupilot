@@ -13,35 +13,55 @@ const AP_Param::GroupInfo AC_WeatherVane::var_info[] = {
 
     // @Param: ENABLE
     // @DisplayName: Enable
-    // @Description{Copter}: Enable weather vaning.  When active, and the appropriate _OPTIONS bit is set for auto, or guided, the aircraft will yaw into wind once the vehicle is above WVANE_MIN_ALT, is not moving, and there has been no pilot input for 3 seconds.
+    // @Description{Copter}: Enable weather vaning.  When active, and the appropriate _OPTIONS bit is set for auto, or guided, the aircraft will yaw into wind once the vehicle is in a condition that meets that set by the WVANE parameters and there has been no pilot input for 3 seconds.
     // @Description{Plane}: Enable weather vaning.  When active, the aircraft will automatically yaw into wind when in a VTOL position controlled mode. Pilot yaw commands overide the weathervaning action.
-    // @Values: 0:Disabled,1:Nose into wind,2:Nose or tail into wind (tailsitters)
+    // @Values: 0:Disabled,1:Nose into wind,2:Nose or tail into wind,3:Side into wind
     // @User: Standard
     AP_GROUPINFO_FLAGS("ENABLE", 1, AC_WeatherVane, _direction, 0, AP_PARAM_FLAG_ENABLE),
 
     // @Param: GAIN
     // @DisplayName: Weathervaning gain
-    // @Description: This controls the tendency to yaw to face into the wind. A value of 0.1 is to start with and will give a slow turn into the wind. Use a value of 0.4 for more rapid response. The weathervaning works by turning into the direction of roll.
-    // @Range: 0 2
+    // @Description: This converts the target roll/pitch angle of the aircraft into the correcting (into wind) yaw rate. e.g. Gain = 2, roll = 30 deg, yaw rate = 60 deg/s.
+    // @Range: 0 4
     // @Increment: 0.1
     // @User: Standard
     AP_GROUPINFO("GAIN", 2, AC_WeatherVane, _gain, 0.5),
 
-    // @Param: MIN_ANG
+    // @Param: ANG_MIN
     // @DisplayName: Weathervaning min angle
-    // @Description: The minimum angle error, in degrees, before active weathervaning will start.
+    // @Description: The minimum target roll/pitch angle before active weathervaning will start.  This provides a dead zone that is particularly useful for poorly trimmed quadplanes.
+    // @Units: deg
     // @Range: 0 10
     // @Increment: 0.1
     // @User: Standard
-    AP_GROUPINFO("MIN_ANG", 3, AC_WeatherVane, _min_dz_ang_deg, 1),
+    AP_GROUPINFO("ANG_MIN", 3, AC_WeatherVane, _min_dz_ang_deg, 1),
 
-    // @Param: MIN_ALT
-    // @DisplayName: Weathervaning min altitude
-    // @Description: Above this altitude weathervaning is permitted.  If terrain is enabled, AGL is used.  Set zero to ignore altitude.
+    // @Param: HGT_MIN
+    // @DisplayName: Weathervaning min height
+    // @Description: Above this height weathervaning is permitted.  If terrain is enabled, this parameter sets height AGL.  If terrain is not enabled, this parameter sets height above home.  Set zero to ignore height requirement.
+    // @Units: m
     // @Range: 0 50
     // @Increment: 1
     // @User: Standard
-    AP_GROUPINFO("MIN_ALT", 4, AC_WeatherVane, _min_alt, 2),
+    AP_GROUPINFO("HGT_MIN", 4, AC_WeatherVane, _min_height, 2),
+
+    // @Param: VXY_MAX
+    // @DisplayName: Weathervaning max ground speed
+    // @Description: Below this hoizontal velocity weathervaning is permitted.  Based on ground speed.  Set to 0 to ignore this condition when checking if vehicle should weathervane.
+    // @Units: m/s
+    // @Range: 0 50
+    // @Increment: 0.1
+    // @User: Standard
+    AP_GROUPINFO("VXY_MAX", 5, AC_WeatherVane, _max_vel_xy, 2.0f),
+
+    // @Param: VZ_MAX
+    // @DisplayName: Weathervaning max vertical speed
+    // @Description: The maximum climb or descent speed that the vehicle will still attempt to weathervane.  Set to 0 to ignore this condition to get the aircraft to weathervane at any climb/descent rate.
+    // @Units: m/s
+    // @Range: 0 5
+    // @Increment: 0.1
+    // @User: Standard
+    AP_GROUPINFO("VZ_MAX", 6, AC_WeatherVane, _max_vel_z, 1.0f),
 
     AP_GROUPEND
 };
@@ -55,58 +75,54 @@ AC_WeatherVane::AC_WeatherVane(const AP_InertialNav& inav) :
     AP_Param::setup_object_defaults(this, var_info);
 }
 
-bool AC_WeatherVane::get_yaw_rate_cds(float& yaw_rate, const int16_t pilot_yaw, const int16_t roll_cdeg, const int16_t pitch_cdeg)
+float AC_WeatherVane::get_yaw_rate_cds(const int16_t roll_cdeg, const int16_t pitch_cdeg)
 {
-    const uint32_t now = AP_HAL::millis();
-
-    // If it has been longer than 5 seconds since last call back then reset the controller
-    if (now - last_callback > 5000) {
-        reset();
-    }
-    last_callback = now;
-
-    if (!should_weathervane(pilot_yaw, roll_cdeg, pitch_cdeg, now)) {
-        return false;
-    }
-
     if (!active_msg_sent) {
         gcs().send_text(MAV_SEVERITY_INFO, "Weathervane Active");
         active_msg_sent = true;
     }
 
-    // Calculate new yaw rate
-    float output = fabsf((float)roll_cdeg) * _gain.get();
+    float output = 0.0f;
+    switch (get_direction()) {
+        case Direction::OFF:
+            return 0.0f;
 
-    // For nose in only direction, we add nose up pitch contribution to maintain a 
-    // consistant yaw rate when the vehicle has its tail to the wind.
-    if (pitch_cdeg > 0 && get_direction() == Direction::NOSE_IN) {
-        output += (float)pitch_cdeg * _gain.get();
+        case Direction::NOSE_OR_TAIL_IN:
+            output = roll_cdeg * _gain;
+
+            if (pitch_cdeg > 0) {
+                output *= -1.0f;
+            }
+            break;
+
+        case Direction::NOSE_IN:
+            output = (fabsf(roll_cdeg) + MAX(pitch_cdeg,0.0f)) * _gain;
+
+            // Yaw in the direction of the lowest 'wing'
+            if (roll_cdeg < 0) {
+                output *= -1.0f;
+            }
+            break;
+
+        case Direction::SIDE_IN:
+            output = pitch_cdeg * _gain;
+
+            if (roll_cdeg < 0) {
+                output *= -1.0f;
+            }
+            break;
+
     }
 
-    /*
-      Determine yaw direction
-
-      If we can yaw nose or tail into wind we want to yaw in the direction
-      oppose to the roll angle when we have nose high attitudes. The nose
-      low behaviour is as per NOSE_IN behaviour.
-
-      At this point output only has magnitude, not direction.
-    */
-    if (pitch_cdeg > 0 && get_direction() == Direction::NOSE_OR_TAIL_IN) {
-        if (roll_cdeg > 0) {
-            output *= -1.0f;
-        } // else roll will be negative and we want the output to be positive
-
-    } else if (pitch_cdeg < 0 || get_direction() == Direction::NOSE_IN) {
-        // Yaw in the direction of the lowest 'wing'
-        if (roll_cdeg < 0) {
-            output *= -1.0f;
-        }
+    // Don't activatively weather vane if less than deadzone angle
+    float angle = get_direction() == Direction::SIDE_IN ? pitch_cdeg : roll_cdeg;
+    if (fabsf(angle) < _min_dz_ang_deg*100.0f && !(pitch_cdeg > _min_dz_ang_deg*100.0f && get_direction() == Direction::NOSE_IN)) {
+        output = 0.0f;
     }
 
     // Force the controller to relax.  This can be called when landing.
     if (should_relax) {
-        output = 0;
+        output = 0.0f;
         // Always reset should relax. Maintain relaxed condition by persistant calls to relax()
         should_relax = false;
     }
@@ -114,18 +130,7 @@ bool AC_WeatherVane::get_yaw_rate_cds(float& yaw_rate, const int16_t pilot_yaw, 
     // Slew output
     last_output = 0.98f * last_output + 0.02f * output;
 
-    yaw_rate = last_output;
-
-    //Write to data flash log
-    AP::logger().Write("WVAN",
-                       "TimeUS,yaw,pit,rol",
-                         "Qfff",
-                        AP_HAL::micros64(),
-                        (double)yaw_rate,
-                        (double)pitch_cdeg,
-                        (double)roll_cdeg);
-
-    return true;
+    return last_output;
 }
 
 // Called on an interupt to reset the weathervane controller
@@ -137,19 +142,15 @@ void AC_WeatherVane::reset(void)
     first_activate_ms = 0;
 }
 
-bool AC_WeatherVane::should_weathervane(int16_t pilot_yaw, int16_t roll_cdeg, int16_t pitch_cdeg, const uint32_t now)
+bool AC_WeatherVane::should_weathervane(const int16_t pilot_yaw, const int16_t roll_cdeg, const int16_t pitch_cdeg)
 {
     // Check enabled
-    if ((Direction)((uint8_t)_direction) == Direction::OFF){
+    if (get_direction() == Direction::OFF){
         reset();
         return false;
     }
 
-    // Don't activate weather vaning if less than deadzone angle
-    if (fabsf(roll_cdeg) < _min_dz_ang_deg*100.0f  &&  (pitch_cdeg > 0.0f || get_direction() != Direction::NOSE_IN)) {
-        reset();
-        return 0.0f;
-    }
+    const uint32_t now = AP_HAL::millis();
 
     // Don't fight pilot inputs
     if (pilot_yaw != 0) {
@@ -164,21 +165,32 @@ bool AC_WeatherVane::should_weathervane(int16_t pilot_yaw, int16_t roll_cdeg, in
         return false;
     }
 
-    // Check if we are above the minimum altitude to weather vane
-    if (below_min_alt()) {
+    // Check if we are above the minimum height to weather vane
+    if (below_min_height()) {
+        reset();
+        return false;
+    }
+
+    // Check if we meet the horizontal velocity thresholds to allow weathervaning
+    if ((_max_vel_xy.get() > 0) && (_inav.get_speed_xy()*0.01f) > _max_vel_xy.get()) {
+        reset();
+        return false;
+    }
+
+    // Check if we meet the vertical velocity thresholds to allow weathervaning
+    if ((_max_vel_z.get() > 0) && fabsf(_inav.get_velocity_z())*0.01f > _max_vel_z.get()) {
         reset();
         return false;
     }
 
     /*
       Use a 2 second buffer to ensure weathervaning occurs once the vehicle has
-      clearly settled in an acceptable condition. This avoids weathervane
-      activation as soon as a wp is accepted
+      clearly achieved an acceptable condition.
     */
     if (first_activate_ms == 0) {
         first_activate_ms = now;
     }
-    if (now - first_activate_ms < 2000){
+    if (now - first_activate_ms < 2000) {
         return false;
     }
 
@@ -186,39 +198,26 @@ bool AC_WeatherVane::should_weathervane(int16_t pilot_yaw, int16_t roll_cdeg, in
     return true;
 }
 
-bool AC_WeatherVane::below_min_alt(void)
+bool AC_WeatherVane::below_min_height(void)
 {
-    // Check min altitude is set
-    if (_min_alt.get() <= 0) {
+    // Check min height is set
+    if (_min_height.get() <= 0) {
         return false;
     }
 
 #if AP_TERRAIN_AVAILABLE
     AP_Terrain* terrain = AP_Terrain::get_singleton();
     if (terrain != nullptr) {
-        float terr_alt = 0.0f;
-        if (terrain->enabled() && terrain->height_above_terrain(terr_alt, true) && terr_alt >= (float)_min_alt.get()) {
+        float terr_height = 0.0f;
+        if (terrain->enabled() && terrain->height_above_terrain(terr_height, true) && terr_height >= (float)_min_height.get()) {
             return false;
         }
     }
 #endif
 
-    if (_inav.get_altitude() >= (float)_min_alt.get()) {
+    if (_inav.get_altitude()*0.01f >= (float)_min_height.get()) {
         return false;
     }
 
     return true;
 }
-
-AC_WeatherVane::Direction AC_WeatherVane::get_direction() const
-{
-    return (Direction)_direction.get();
-}
-
-// Get the AC_WeatherVane singleton
-AC_WeatherVane *AC_WeatherVane::get_singleton()
-{
-    return _singleton;
-}
-
-AC_WeatherVane *AC_WeatherVane::_singleton = nullptr;
