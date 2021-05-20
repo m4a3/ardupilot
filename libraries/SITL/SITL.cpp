@@ -40,6 +40,11 @@ const AP_Param::GroupInfo SITL::var_info[] = {
     AP_GROUPINFO("DRIFT_SPEED",5, SITL,  drift_speed, 0.05f),
     AP_GROUPINFO("DRIFT_TIME", 6, SITL,  drift_time,  5),
     AP_GROUPINFO("GPS_DELAY",  7, SITL,  gps_delay,   1),
+
+    // @Param: ENGINE_MUL
+    // @DisplayName: Engine Multiplier
+    // @Description: The ratio to be applied to servo output to simulate either a reduced power or total power failure
+    // @User: Standard
     AP_GROUPINFO("ENGINE_MUL", 8, SITL,  engine_mul,  1),
     AP_GROUPINFO("WIND_SPD",   9, SITL,  wind_speed,  0),
     AP_GROUPINFO("WIND_DIR",  10, SITL,  wind_direction,  180),
@@ -92,6 +97,12 @@ const AP_Param::GroupInfo SITL::var_info[] = {
     AP_GROUPINFO("ACC2_BIAS",     57, SITL,  accel2_bias, 0),
     AP_GROUPINFO("GPS_NOISE",     58, SITL,  gps_noise, 0),
     AP_GROUPINFO("GP2_GLITCH",    59, SITL,  gps2_glitch,  0),
+
+    // @Param: ENGINE_FAIL
+    // @DisplayName: motor failure bitmask
+    // @Description: Bitmask to set which motor to fail 
+    // @Bitmask: 0:Motor 1, 1:Motor 2, 2:Motor 3, 3:Motor 4, 4:Motor 5, 5:Motor 6, 6:Motor 7, 7:Motor 8
+    // @User: Standard
     AP_GROUPINFO("ENGINE_FAIL",   60, SITL,  engine_fail,  0),
     AP_GROUPINFO("GPS2_TYPE",     61, SITL,  gps2_type,  SITL::GPS_TYPE_UBLOX),
     AP_SUBGROUPEXTENSION("",      62, SITL,  var_info3),
