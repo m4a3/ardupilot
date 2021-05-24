@@ -996,10 +996,6 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     AP_GROUPINFO("RTL_OPTIONS", 43, ParametersG2, rtl_options, 0),
 #endif
 
-    // @Group: WVANE
-    // @Path: ../libraries/AC_AttitudeControl/AC_WeatherVane.cpp
-    AP_SUBGROUPINFO(weathervane, "WVANE_", 44, ParametersG2, AC_WeatherVane),
-
     // @Group: WVANE_
     // @Path: ../libraries/AC_AttitudeControl/AC_WeatherVane.cpp
     AP_SUBGROUPINFO(weathervane, "WVANE_", 45, ParametersG2, AC_WeatherVane),
