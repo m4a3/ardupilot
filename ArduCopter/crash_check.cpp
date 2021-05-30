@@ -233,22 +233,6 @@ void Copter::parachute_check()
         // release parachute
         parachute.release(AP_Parachute::release_reason::CONTROL_LOSS);
     }
-
-    // pass sink rate to parachute library
-    parachute.set_sink_rate(-inertial_nav.get_velocity_z() * 0.01);
-}
-
-// parachute_release - trigger the release of the parachute, disarm the motors and notify the user
-void Copter::parachute_release()
-{
-    // disarm motors
-    arming.disarm();
-
-    // release parachute
-    parachute.release();
-
-    // deploy landing gear
-    landinggear.set_position(AP_LandingGear::LandingGear_Deploy);
 }
 
 // parachute_manual_release - trigger the release of the parachute, after performing some checks for pilot error
