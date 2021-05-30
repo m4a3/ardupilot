@@ -223,7 +223,7 @@ void AP_Parachute::update()
 
     if (!_release_initiated) {
         gcs().send_text(MAV_SEVERITY_INFO,"Parachute: Releaseed");
-        AP::logger().Write_Event(LogEvent::PARACHUTE_RELEASED);
+        AP::logger().Write_Event(DATA_PARACHUTE_RELEASED);
     }
 
     if (_options & NOTIFY_ONLY) {
@@ -260,7 +260,7 @@ void AP_Parachute::update()
             }
             if ((_options & DONT_DISARM) == 0) {
                 // force disarm
-                AP::arming().disarm(AP_Arming::Method::PARACHUTE_RELEASE,false);
+                AP::arming().disarm();
             }
             _release_setup = true;
         }
