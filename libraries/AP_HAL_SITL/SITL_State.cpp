@@ -457,12 +457,12 @@ void SITL_State::_simulator_servos(struct sitl_input &input)
 
     float engine_mul = _sitl?_sitl->engine_mul.get():1;
     uint16_t engine_fail = _sitl?_sitl->engine_fail.get():0;
-    float throttle = 0.0f;
+    bool motors_on = false;
 
     // apply engine multiplier to motor defined by the SIM_ENGINE_FAIL parameter
     for (i=0; i<SITL_NUM_CHANNELS; i++) {
         if (engine_fail & 1U<<i) {
-            if (_vehicle != Rover) {
+            if (_vehicle != APMrover2) {
                 input.servos[i] = ((input.servos[i]-1000) * engine_mul) + 1000;
             } else {
                 input.servos[i] = static_cast<uint16_t>(((input.servos[i] - 1500) * engine_mul) + 1500);
