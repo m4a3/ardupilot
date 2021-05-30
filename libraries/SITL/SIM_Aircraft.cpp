@@ -251,7 +251,7 @@ void Aircraft::sync_frame_time(void)
         sleep_debt_us -= (get_wall_time_us() - now);
     }
     last_wall_time_us = get_wall_time_us();
-
+/*
     uint32_t now_ms = last_wall_time_us / 1000ULL;
     float dt_wall = (now_ms - last_fps_report_ms) * 0.001;
     if (dt_wall > 2.0) {
@@ -262,6 +262,7 @@ void Aircraft::sync_frame_time(void)
                  rate_hz*target_speedup, achieved_rate_hz,
                  achieved_rate_hz/rate_hz, target_speedup);
     }
+*/
 }
 
 /* add noise based on throttle level (from 0..1) */
