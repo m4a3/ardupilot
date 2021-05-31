@@ -87,6 +87,7 @@ void JSON_Master::receve(struct sitl_input &input)
             }
         }
 
+/*
         const bool use_servos = list->instance == master_instance;
 
 // @LoggerMessage: SLV1
@@ -146,7 +147,7 @@ void JSON_Master::receve(struct sitl_input &input)
                        buffer.pwm[12],
                        buffer.pwm[13],
                        buffer.pwm[14]);
-
+*/
         if (list->instance == master_instance) {
             // Use the servo outs from this instance
             memcpy(input.servos,buffer.pwm,sizeof(input.servos));
