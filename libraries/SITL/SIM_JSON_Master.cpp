@@ -18,6 +18,7 @@
 
 #include "SIM_JSON_Master.h"
 #include <AP_Logger/AP_Logger.h>
+#include <stdio.h>
 
 using namespace SITL;
 
