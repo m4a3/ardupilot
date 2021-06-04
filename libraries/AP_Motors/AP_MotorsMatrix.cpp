@@ -721,6 +721,17 @@ void AP_MotorsMatrix::setup_motors(motor_frame_class frame_class, motor_frame_ty
                     add_motor(AP_MOTORS_MOT_6,   45, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  2);
                     add_motor(AP_MOTORS_MOT_7,  135, AP_MOTORS_MATRIX_YAW_FACTOR_CCW, 4);
                     add_motor(AP_MOTORS_MOT_8, -135, AP_MOTORS_MATRIX_YAW_FACTOR_CW,  6);
+
+                    // Calculated throttle factors based on CG location
+                    _throttle_factor[0] = 1.0000;
+                    _throttle_factor[1] = 1.0000;
+                    _throttle_factor[2] = 0.8766;
+                    _throttle_factor[3] = 0.8766;
+                    _throttle_factor[4] = 1.0000;
+                    _throttle_factor[5] = 1.0000;
+                    _throttle_factor[6] = 0.8766;
+                    _throttle_factor[7] = 0.8766;
+
                     break;
                 case MOTOR_FRAME_TYPE_V:
                     add_motor(AP_MOTORS_MOT_1,   45,  0.7981f, 1);
@@ -826,6 +837,14 @@ void AP_MotorsMatrix::setup_motors(motor_frame_class frame_class, motor_frame_ty
 
     // normalise factors to magnitude 0.5
     normalise_rpy_factors();
+
+#if 0
+    for (uint8_t i = 0; i < AP_MOTORS_MAX_NUM_MOTORS; i++) {
+        if (motor_enabled[i]) {
+            hal.console->printf("%i - Roll: %0.2f, Pitch %0.2f, Yaw: %0.2f, throttle: %0.2f\n",i,_roll_factor[i],_pitch_factor[i],_yaw_factor[i],_throttle_factor[i]);
+        }
+    }
+#endif
 
     _flags.initialised_ok = success;
 }
