@@ -706,7 +706,6 @@ private:
     void crash_check();
     void thrust_loss_check();
     void parachute_check();
-    void parachute_release();
     void parachute_manual_release();
 
     // ekf_check.cpp
@@ -919,6 +918,8 @@ private:
 #if OSD_ENABLED == ENABLED
     void publish_osd_info();
 #endif
+
+    bool get_standby() const override { return standby_active; }
 
     Mode *flightmode;
 #if MODE_ACRO_ENABLED == ENABLED

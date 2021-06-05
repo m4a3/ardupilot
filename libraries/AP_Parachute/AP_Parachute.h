@@ -5,6 +5,8 @@
 #include <AP_Param/AP_Param.h>
 #include <AP_Common/AP_Common.h>
 #include <AP_Relay/AP_Relay.h>
+#include <GCS_MAVLink/GCS.h>
+
 
 #define AP_PARACHUTE_TRIGGER_TYPE_RELAY_0       0
 #define AP_PARACHUTE_TRIGGER_TYPE_RELAY_1       1
@@ -51,8 +53,18 @@ public:
     /// enabled - returns true if parachute release is enabled
     bool enabled() const { return _enabled; }
 
+    MAV_RESULT handle_cmd(const mavlink_command_long_t &packet);
+
+    enum release_reason {
+        SINK_RATE = 0,
+        ACCEL_FALLING = 1,
+        CONTROL_LOSS = 2,
+        MISSION_ITEM = 3,
+        MANUAL = 4,
+    };
+
     /// release - release parachute
-    void release();
+    void release(release_reason reason);
 
     /// released - true if the parachute has been released (or release is in progress)
     bool released() const { return _released; }
@@ -73,11 +85,18 @@ public:
     ///   0 = altitude check disabled
     int16_t alt_min() const { return _alt_min; }
 
+    float max_ang_err() const { return _ang_error_max.get(); }
+
+    float max_rp_ang() const { return _sb_rp_ang_max.get(); }
+
     /// set_is_flying - accessor to the is_flying flag
     void set_is_flying(const bool is_flying) { _is_flying = is_flying; }
 
-    // set_sink_rate - set vehicle sink rate
-    void set_sink_rate(float sink_rate) { _sink_rate = sink_rate; }
+    // update - set vehicle sink rate and earth frame Z accel
+    void update(const float sink_rate, const float accel, const bool throttle_below_hover);
+
+    // trigger parachute release thresholds
+    void check();
 
     static const struct AP_Param::GroupInfo        var_info[];
 
@@ -85,6 +104,24 @@ public:
     static AP_Parachute *get_singleton() { return _singleton; }
 
 private:
+
+    // send user command long updating the parchute status
+    void send_msg();
+
+    // Structure to lookup for release reasons
+    struct LookupTable{
+       release_reason option;
+       const char *announcement;
+    };
+    static const LookupTable lookuptable[];
+    const char *string_for_release(release_reason reason) const;
+
+    enum OPTIONS {
+        DONT_DEPLOY_LANDING_GEAR = 1U << 0,
+        DONT_DISARM = 1U << 1,
+        NOTIFY_ONLY = 1U << 2,
+    };
+
     static AP_Parachute *_singleton;
     // Parameters
     AP_Int8     _enabled;       // 1 if parachute release is enabled
@@ -94,16 +131,26 @@ private:
     AP_Int16    _alt_min;       // min altitude the vehicle should have before parachute is released
     AP_Int16    _delay_ms;      // delay before chute release for motors to stop
     AP_Float    _critical_sink;      // critical sink rate to trigger emergency parachute
+    AP_Float    _min_accel;          // critical earth frame Z acceleration
+    AP_Int32    _options;            // bitmask of options
+    AP_Int32    _cancel_delay;
+    AP_Float    _ang_error_max;       // Maximum roll/pitch error when aircraft not in standby
+    AP_Float    _sb_rp_ang_max;       // Maximum absolute roll/pitch angle when aircraft in standby
 
     // internal variables
     AP_Relay   &_relay;         // pointer to relay object from the base class Relay.
     uint32_t    _release_time;  // system time that parachute is ordered to be released (actual release will happen 0.5 seconds later)
     bool        _release_initiated:1;    // true if the parachute release initiated (may still be waiting for engine to be suppressed etc.)
+    bool        _release_setup:1;        // true if parchute release has been setup (vehicle disarmed, landing gear deployed)
     bool        _release_in_progress:1;  // true if the parachute release is in progress
     bool        _released:1;             // true if the parachute has been released
     bool        _is_flying:1;            // true if the vehicle is flying
-    float       _sink_rate;              // vehicle sink rate in m/s
-    uint32_t    _sink_time;              // time that the vehicle exceeded critical sink rate
+    uint32_t    _sink_time_ms;           // system time that the vehicle exceeded critical sink rate
+    uint32_t    _fall_time_ms;           // system time that the vehicle stated falling lower faster _min_accel
+    uint8_t     _release_reasons;        // bitmask of the current reasons to release
+    uint32_t    _cancel_timeout_ms;
+    uint32_t    _last_msg_send_ms;
+
 };
 
 namespace AP {

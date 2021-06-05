@@ -2159,13 +2159,16 @@ class AutoTestCopter(AutoTest):
 
     def test_parachute(self):
 
+        # Initial setup
         self.set_rc(9, 1000)
         self.set_parameter("CHUTE_ENABLED", 1)
         self.set_parameter("CHUTE_TYPE", 10)
+        self.set_parameter("CHUTE_CRT_SINK", 6)
         self.set_parameter("SERVO9_FUNCTION", 27)
         self.set_parameter("SIM_PARA_ENABLE", 1)
         self.set_parameter("SIM_PARA_PIN", 9)
 
+        # Test trigger from mission command
         self.progress("Test triggering parachute in mission")
         self.load_mission("copter_parachute_mission.txt")
         self.change_mode('LOITER')
@@ -2176,8 +2179,9 @@ class AutoTestCopter(AutoTest):
         self.mavproxy.expect('BANG')
         self.reboot_sitl()
 
+        # Test trigger direct from mavlink message
         self.progress("Test triggering with mavlink message")
-        self.takeoff(20)
+        self.takeoff(alt_min=20, takeoff_throttle=1800, require_absolute=True, mode="ALT_HOLD", timeout=120)
         self.run_cmd(mavutil.mavlink.MAV_CMD_DO_PARACHUTE,
                      2, # release
                      0,
@@ -2189,9 +2193,9 @@ class AutoTestCopter(AutoTest):
         self.mavproxy.expect('BANG')
         self.reboot_sitl()
 
+        # Test trigger from 3-position switch on RC transmitter
         self.progress("Testing three-position switch")
         self.set_parameter("RC9_OPTION", 23) # parachute 3pos
-
         self.progress("Test manual triggering")
         self.takeoff(20)
         self.set_rc(9, 2000)
@@ -2199,23 +2203,46 @@ class AutoTestCopter(AutoTest):
         self.set_rc(9, 1000)
         self.reboot_sitl()
 
+        # Test trigger from 3-position switch on RC transmitter
+        # Chute should not if in report only mode
+        self.progress("Test report only option")
+        self.set_parameter("CHUTE_OPTIONS", 4)
+        self.takeoff(20)
+        self.set_rc(9, 2000)
+        tstart = self.get_sim_time()
+        while self.get_sim_time_cached() < tstart + 5:
+            m = self.mav.recv_match(type='STATUSTEXT', blocking=True, timeout=1)
+            if m is None:
+                continue
+            if "BANG" in m.text:
+                self.set_rc(9, 1000)
+                self.reboot_sitl()
+                raise NotAchievedException("Parachute deployed when in notify only mode")
+        self.set_rc(9, 1000)
+        self.set_parameter("CHUTE_OPTIONS", 0)
+        self.disarm_vehicle(force=True)
+        self.reboot_sitl()
+
+        # Test motor failure with 3 position switch setting enable
         self.context_push()
         self.progress("Crashing with 3pos switch in enable position")
         self.takeoff(40)
         self.set_rc(9, 1500)
-        self.set_parameter("SIM_ENGINE_MUL", 0)
-        self.set_parameter("SIM_ENGINE_FAIL", 1)
-        self.mavproxy.expect('BANG')
+        self.set_parameter("SIM_ENGINE_FAIL", 15)
+        self.set_parameter("SIM_ENGINE_MUL", 0.55)
+        self.wait_statustext('BANG', timeout=60)
         self.set_rc(9, 1000)
         self.reboot_sitl()
+        self.set_parameter("SIM_ENGINE_FAIL", 0)
+        self.set_parameter("SIM_ENGINE_MUL", 1)
         self.context_pop()
 
+        # Test motor failure with 3 position switch setting disabled - Chute should not deploy
         self.progress("Crashing with 3pos switch in disable position")
-        loiter_alt = 10
-        self.takeoff(loiter_alt, mode='LOITER')
+        self.takeoff(40, mode='LOITER', timeout=120)
         self.set_rc(9, 1100)
-        self.set_parameter("SIM_ENGINE_MUL", 0)
-        self.set_parameter("SIM_ENGINE_FAIL", 1)
+        self.set_parameter("SIM_ENGINE_FAIL", 15)
+        self.set_parameter("SIM_ENGINE_MUL", 0.55)
         tstart = self.get_sim_time()
         while self.get_sim_time_cached() < tstart + 5:
             m = self.mav.recv_match(type='STATUSTEXT', blocking=True, timeout=1)
@@ -2226,6 +2253,57 @@ class AutoTestCopter(AutoTest):
                 self.reboot_sitl()
                 raise NotAchievedException("Parachute deployed when disabled")
         self.set_rc(9, 1000)
+        self.disarm_vehicle(force=True)
+        # reset params for next test
+        self.set_parameter("SIM_ENGINE_FAIL", 0)
+        self.set_parameter("SIM_ENGINE_MUL", 1)
+        self.reboot_sitl()
+
+        # Test sink rate trigger below min alt - Chute should not deploy
+        self.progress("Motor failure below min alt, chute not to deploy")
+        self.set_parameter("CHUTE_ALT_MIN", 30)
+        self.takeoff(15, mode='LOITER')
+        # Enable chute via 3 pos switch
+        self.set_rc(9, 1500)
+        self.set_parameter("SIM_ENGINE_FAIL", 15)
+        self.set_parameter("SIM_ENGINE_MUL", 0.5)
+        tstart = self.get_sim_time()
+        while self.get_sim_time_cached() < tstart + 5:
+            m = self.mav.recv_match(type='STATUSTEXT', blocking=True, timeout=1)
+            if m is None:
+                continue
+            if "BANG" in m.text:
+                self.set_rc(9, 1000)
+                self.reboot_sitl()
+                raise NotAchievedException("Parachute deployed when disabled")
+        self.set_rc(9, 1000)
+        self.disarm_vehicle(force=True)
+        # reset params for next test
+        self.set_parameter("SIM_ENGINE_FAIL", 0)
+        self.set_parameter("SIM_ENGINE_MUL", 1)
+        self.set_parameter("CHUTE_ALT_MIN", 10)
+        self.reboot_sitl()
+
+        # Test loss of control
+        self.progress("Motor failure one motor - test loss of control")
+        # Set impossible sink rate to avoid tripping the sink rate reason before we trip the loss of control
+        self.set_parameter("CHUTE_CRT_SINK", 1000)
+        self.takeoff(40, mode='LOITER', timeout=120)
+        # Enable chute via 3 pos switch
+        self.set_rc(9, 1500)
+
+        # Apply full pitch and roll sticks
+        self.set_rc(1, 2000)
+        self.set_rc(2, 2000)
+        # Total motor failure on motor 1 and 4 to cause tumbling
+        self.set_parameter("SIM_ENGINE_FAIL", 9)
+        self.set_parameter("SIM_ENGINE_MUL", 0)
+        self.wait_statustext('loss of control', timeout=30)
+        self.set_rc(9, 1000)
+        self.disarm_vehicle(force=True)
+        # reset params for next test
+        self.set_parameter("SIM_ENGINE_FAIL", 0)
+        self.set_parameter("SIM_ENGINE_MUL", 1)
         self.reboot_sitl()
 
     def fly_precision_sitl(self):

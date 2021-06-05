@@ -4,6 +4,7 @@
 #define CRASH_CHECK_TRIGGER_SEC         2       // 2 seconds inverted indicates a crash
 #define CRASH_CHECK_ANGLE_DEVIATION_DEG 30.0f   // 30 degrees beyond angle max is signal we are inverted
 #define CRASH_CHECK_ACCEL_MAX           3.0f    // vehicle must be accelerating less than 3m/s/s to be considered crashed
+#define CRASH_CHECK_ANGLE_DEG           80.0f   // vehicle byound this lean angle will trigger crash check
 
 // Code to detect a thrust loss main ArduCopter code
 #define THRUST_LOSS_CHECK_TRIGGER_SEC         1     // 1 second descent while level and high throttle indicates thrust loss
@@ -156,18 +157,20 @@ void Copter::parachute_check()
     static uint16_t control_loss_count;	// number of iterations we have been out of control
     static int32_t baro_alt_start;
 
-    // exit immediately if parachute is not enabled
-    if (!parachute.enabled()) {
-        return;
-    }
+    // pass is_flying to parachute library
+    parachute.set_is_flying(!ap.land_complete);
 
-    // exit immediately if in standby
-    if (standby_active) {
-        return;
-    }
+    // pass sink rate to parachute library
+    parachute.update(-inertial_nav.get_velocity_z() * 0.01f,
+                    copter.ahrs.get_accel_ef().z,
+                    motors->get_throttle() < motors->get_throttle_hover());
 
     // call update to give parachute a chance to move servo or relay back to off position
     parachute.update();
+
+    if (!parachute.enabled()) {
+        return;
+    }
 
     // return immediately if motors are not armed or pilot's throttle is above zero
     if (!motors->armed()) {
@@ -181,8 +184,8 @@ void Copter::parachute_check()
         return;
     }
 
-    // ensure we are flying
-    if (ap.land_complete) {
+    // ensure we are flying, ignore land state in standby mode, it can get out of sync
+    if (ap.land_complete && !standby_active) {
         control_loss_count = 0;
         return;
     }
@@ -192,18 +195,25 @@ void Copter::parachute_check()
         return;
     }
 
-    // check for angle error over 30 degrees
-    const float angle_error = attitude_control->get_att_error_angle_deg();
-    if (angle_error <= CRASH_CHECK_ANGLE_DEVIATION_DEG) {
-        if (control_loss_count > 0) {
+    // Check parachute thresholds
+    parachute.check();
+
+    if (standby_active) {
+        // in standby mode check for large angles
+        if (degrees(norm(copter.ahrs.get_roll(), copter.ahrs.get_pitch())) > MAX(parachute.max_rp_ang(),copter.aparm.angle_max)) {
+            control_loss_count++;
+        } else if (control_loss_count > 0) {
             control_loss_count--;
         }
-        return;
-    }
 
-    // increment counter
-    if (control_loss_count < (PARACHUTE_CHECK_TRIGGER_SEC*scheduler.get_loop_rate_hz())) {
-        control_loss_count++;
+    } else {
+        // full control check for angle error
+        const float angle_error = attitude_control->get_att_error_angle_deg();
+        if (angle_error >= parachute.max_ang_err()) {
+            control_loss_count++;
+        } else if (control_loss_count > 0) {
+            control_loss_count--;
+        }
     }
 
     // record baro alt if we have just started losing control
@@ -215,32 +225,14 @@ void Copter::parachute_check()
         control_loss_count = 0;
         return;
 
-    // To-Do: add check that the vehicle is actually falling
-
     // check if loss of control for at least 1 second
     } else if (control_loss_count >= (PARACHUTE_CHECK_TRIGGER_SEC*scheduler.get_loop_rate_hz())) {
         // reset control loss counter
         control_loss_count = 0;
         AP::logger().Write_Error(LogErrorSubsystem::CRASH_CHECK, LogErrorCode::CRASH_CHECK_LOSS_OF_CONTROL);
         // release parachute
-        parachute_release();
+        parachute.release(AP_Parachute::release_reason::CONTROL_LOSS);
     }
-
-    // pass sink rate to parachute library
-    parachute.set_sink_rate(-inertial_nav.get_velocity_z() * 0.01);
-}
-
-// parachute_release - trigger the release of the parachute, disarm the motors and notify the user
-void Copter::parachute_release()
-{
-    // disarm motors
-    arming.disarm();
-
-    // release parachute
-    parachute.release();
-
-    // deploy landing gear
-    landinggear.set_position(AP_LandingGear::LandingGear_Deploy);
 }
 
 // parachute_manual_release - trigger the release of the parachute, after performing some checks for pilot error
@@ -253,8 +245,8 @@ void Copter::parachute_manual_release()
     }
 
     // do not release if vehicle is landed
-    // do not release if we are landed or below the minimum altitude above home
-    if (ap.land_complete) {
+    // land flag cannot be trusted if in standby mode
+    if (ap.land_complete && !standby_active) {
         // warn user of reason for failure
         gcs().send_text(MAV_SEVERITY_INFO,"Parachute: Landed");
         AP::logger().Write_Error(LogErrorSubsystem::PARACHUTES, LogErrorCode::PARACHUTE_LANDED);
@@ -270,7 +262,7 @@ void Copter::parachute_manual_release()
     }
 
     // if we get this far release parachute
-    parachute_release();
+    parachute.release(AP_Parachute::release_reason::MANUAL);
 }
 
 #endif // PARACHUTE == ENABLED
