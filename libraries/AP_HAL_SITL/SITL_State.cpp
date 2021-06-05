@@ -332,6 +332,11 @@ void SITL_State::_fdm_input_local(void)
     // construct servos structure for FDM
     _simulator_servos(input);
 
+    // read servo inputs from ride along flight controllers
+    if (ride_along != nullptr) {
+        ride_along->receve(input);
+    }
+
     // update the model
     sitl_model->update_model(input);
 
@@ -345,6 +350,11 @@ void SITL_State::_fdm_input_local(void)
                 pwm_input[i] = 1000 + _sitl->state.rcin[i]*1000;
             }
         }
+    }
+
+    // output JSON state to ride along flight controllers
+    if (ride_along != nullptr) {
+        ride_along->send(_sitl->state,sitl_model->get_position());
     }
 
     if (gimbal != nullptr) {

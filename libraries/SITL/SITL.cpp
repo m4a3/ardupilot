@@ -223,6 +223,14 @@ const AP_Param::GroupInfo SITL::var_info3[] = {
     AP_GROUPINFO("MAG6_DEVID",    8, SITL,  mag_devid[5], 98051),
     AP_GROUPINFO("MAG7_DEVID",    9, SITL,  mag_devid[6], 0),
     AP_GROUPINFO("MAG8_DEVID",    10, SITL, mag_devid[7], 0),
+
+    AP_GROUPINFO("RATE_HZ",  22, SITL,  loop_rate_hz, 1200),
+
+    // @Param: JSON_MASTER
+    // @DisplayName: JSON master instance
+    // @Description: the instance number to  take servos from
+    AP_GROUPINFO("JSON_MASTER",     26, SITL, ride_along_master, 0),
+
     AP_GROUPEND
 
 };
@@ -325,6 +333,14 @@ Vector3f SITL::convert_earth_frame(const Matrix3f &dcm, const Vector3f &gyro)
     float psiDot = (q*sinf(phi) + r*cosf(phi))/cosf(theta);
     return Vector3f(phiDot, thetaDot, psiDot);
 }
+
+// get the rangefinder reading for the desired rotation, returns -1 for no data
+float SITL::get_rangefinder(uint8_t instance) {
+    if (instance < RANGEFINDER_MAX_INSTANCES) {
+        return state.rangefinder_m[instance];
+    }
+    return -1;
+};
 
 } // namespace SITL
 

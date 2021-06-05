@@ -12,6 +12,7 @@
 #include "SIM_Precland.h"
 #include "SIM_Sprayer.h"
 #include "SIM_ToneAlarm.h"
+#include <AP_RangeFinder/AP_RangeFinder.h>
 
 namespace SITL {
 
@@ -35,7 +36,7 @@ struct sitl_fdm {
     double heading;   // degrees
     double speedN, speedE, speedD; // m/s
     double xAccel, yAccel, zAccel;       // m/s/s in body frame
-    double rollRate, pitchRate, yawRate; // degrees/s/s in body frame
+    double rollRate, pitchRate, yawRate; // degrees/s in body frame
     double rollDeg, pitchDeg, yawDeg;    // euler angles, degrees
     Quaternion quaternion;
     double airspeed; // m/s
@@ -54,6 +55,13 @@ struct sitl_fdm {
         struct vector3f_array points;
         struct float_array ranges;
     } scanner;
+
+    float rangefinder_m[RANGEFINDER_MAX_INSTANCES];
+
+    struct {
+        float speed;
+        float direction;
+    } wind_vane_apparent;
 };
 
 // number of rc output channels
@@ -188,6 +196,7 @@ public:
     AP_Int32 loop_delay; // extra delay to add to every loop
     AP_Float mag_scaling; // scaling factor on first compasses
     AP_Int32 mag_devid[MAX_CONNECTED_MAGS]; // Mag devid
+    AP_Int16 loop_rate_hz;
 
     // wind control
     enum WindType {
@@ -320,6 +329,16 @@ public:
         uint8_t num_leds[16];
         uint32_t send_counter;
     } led;
+
+    // get the rangefinder reading for the desired instance, returns -1 for no data
+    float get_rangefinder(uint8_t instance);
+
+    // get the apparent wind speed and direction as set by external physics backend
+    float get_apparent_wind_dir(){return state.wind_vane_apparent.direction;}
+    float get_apparent_wind_spd(){return state.wind_vane_apparent.speed;}
+
+    AP_Int8 ride_along_master;
+
 };
 
 } // namespace SITL
