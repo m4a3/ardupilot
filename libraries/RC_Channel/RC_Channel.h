@@ -186,7 +186,11 @@ public:
     };
     typedef enum AUX_FUNC aux_func_t;
 
-protected:
+
+    // pwm value above which the option will be invoked:
+    static const uint16_t AUX_PWM_TRIGGER_HIGH = 1800;
+    // pwm value below which the option will be disabled:
+    static const uint16_t AUX_PWM_TRIGGER_LOW = 1200;
 
     // auxillary switch handling (n.b.: we store this as 2-bits!):
     enum aux_switch_pos_t : uint8_t {
@@ -195,8 +199,11 @@ protected:
         HIGH       // indicates auxiliary switch is in the high position (pwm >1800)
     };
 
-    virtual void init_aux_function(aux_func_t ch_option, aux_switch_pos_t);
     virtual void do_aux_function(aux_func_t ch_option, aux_switch_pos_t);
+
+protected:
+
+    virtual void init_aux_function(aux_func_t ch_option, aux_switch_pos_t);
 
     void do_aux_function_avoid_proximity(const aux_switch_pos_t ch_flag);
     void do_aux_function_camera_trigger(const aux_switch_pos_t ch_flag);
@@ -213,7 +220,6 @@ protected:
     virtual void mode_switch_changed(modeswitch_pos_t new_pos) {
         // no action by default (e.g. Tracker, Sub, who do their own thing)
     };
-
 
 private:
 
@@ -243,10 +249,6 @@ private:
     int16_t pwm_to_angle() const;
     int16_t pwm_to_angle_dz(uint16_t dead_zone) const;
 
-    // pwm value above which the option will be invoked:
-    static const uint16_t AUX_PWM_TRIGGER_HIGH = 1800;
-    // pwm value below which the option will be disabled:
-    static const uint16_t AUX_PWM_TRIGGER_LOW = 1200;
     bool read_3pos_switch(aux_switch_pos_t &ret) const WARN_IF_UNUSED;
 
     // Structure used to detect and debounce switch changes
