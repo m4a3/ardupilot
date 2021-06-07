@@ -3045,15 +3045,11 @@ MAV_RESULT GCS_MAVLINK::handle_fixed_mag_cal_yaw(const mavlink_command_long_t &p
 
 MAV_RESULT GCS_MAVLINK::handle_user_cmd(const mavlink_command_long_t &packet)
 {
-#if HAL_PARACHUTE_ENABLED
     AP_Parachute *parachute = AP::parachute();
     if (parachute == nullptr) {
         return MAV_RESULT_UNSUPPORTED;
     }
     return parachute->handle_cmd(packet);
-#else
-    return MAV_RESULT_UNSUPPORTED;
-#endif // HAL_PARACHUTE_ENABLED
 }
 
 /*
