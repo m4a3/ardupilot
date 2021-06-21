@@ -155,7 +155,6 @@ void Copter::thrust_loss_check()
 void Copter::parachute_check()
 {
     static uint16_t control_loss_count;	// number of iterations we have been out of control
-    static int32_t baro_alt_start;
 
     // pass is_flying to parachute library
     parachute.set_is_flying(!ap.land_complete);
@@ -163,10 +162,13 @@ void Copter::parachute_check()
     // pass sink rate to parachute library
     parachute.update(-inertial_nav.get_velocity_z() * 0.01f,
                     copter.ahrs.get_accel_ef().z,
-                    motors->get_throttle() < motors->get_throttle_hover());
+                    motors->limit.throttle_upper, standby_active);
 
     // call update to give parachute a chance to move servo or relay back to off position
     parachute.update();
+
+    // write a log
+    parachute.write_log(control_loss_count, attitude_control->get_att_error_angle_deg());
 
     if (!parachute.enabled()) {
         return;
@@ -198,35 +200,24 @@ void Copter::parachute_check()
     // Check parachute thresholds
     parachute.check();
 
-    if (standby_active) {
-        // in standby mode check for large angles
-        if (degrees(norm(copter.ahrs.get_roll(), copter.ahrs.get_pitch())) > MAX(parachute.max_rp_ang(),copter.aparm.angle_max*0.01f)) {
-            control_loss_count++;
-        } else if (control_loss_count > 0) {
-            control_loss_count--;
-        }
+    const bool abs_angle = degrees(norm(copter.ahrs.get_roll(), copter.ahrs.get_pitch())) > MAX(parachute.max_rp_ang(),copter.aparm.angle_max*0.01f);
+    const bool control_angle = !standby_active && (attitude_control->get_att_error_angle_deg() >= parachute.max_ang_err());
 
-    } else {
-        // full control check for angle error
-        const float angle_error = attitude_control->get_att_error_angle_deg();
-        if (angle_error >= parachute.max_ang_err()) {
-            control_loss_count++;
-        } else if (control_loss_count > 0) {
-            control_loss_count--;
-        }
+    if (abs_angle && control_angle) {
+        // increment by two if both thresholds are exceeded
+        control_loss_count += 2;
+
+    } else if (abs_angle || control_angle) {
+        // increment by one if only a single threshold
+        control_loss_count += 1;
+
+    } else if (control_loss_count > 0) {
+        // decrement if neither thresholds are exceeded
+        control_loss_count -= 1;
     }
 
-    // record baro alt if we have just started losing control
-    if (control_loss_count == 1) {
-        baro_alt_start = baro_alt;
 
-    // exit if baro altitude change indicates we are not falling
-    } else if (baro_alt >= baro_alt_start) {
-        control_loss_count = 0;
-        return;
-
-    // check if loss of control for at least 1 second
-    } else if (control_loss_count >= (PARACHUTE_CHECK_TRIGGER_SEC*scheduler.get_loop_rate_hz())) {
+    if (control_loss_count >= (parachute.get_control_loss_seconds()*scheduler.get_loop_rate_hz())) {
         // reset control loss counter
         control_loss_count = 0;
         AP::logger().Write_Error(LogErrorSubsystem::CRASH_CHECK, LogErrorCode::CRASH_CHECK_LOSS_OF_CONTROL);

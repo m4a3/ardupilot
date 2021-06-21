@@ -65,8 +65,8 @@ const AP_Param::GroupInfo AP_Parachute::var_info[] = {
     AP_GROUPINFO("DELAY_MS", 5, AP_Parachute, _delay_ms, AP_PARACHUTE_RELEASE_DELAY_MS),
     
     // @Param: CRT_SINK
-    // @DisplayName: Critical sink speed rate in m/s to trigger emergency parachute
-    // @Description: Release parachute when critical sink rate is reached, 0 = disabled
+    // @DisplayName: Critical sink speed rate in m/s to trigger emergency parachute with saturate throttle
+    // @Description: Release parachute when critical sink rate is reached, if throttle is saturated, 0 = disabled
     // @Range: 0 15
     // @Units: m/s
     // @Increment: 1
@@ -108,6 +108,39 @@ const AP_Param::GroupInfo AP_Parachute::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("SB_MX_ANG", 11, AP_Parachute, _sb_rp_ang_max, 80.0f),
 
+    // @Param: CRT_SNK_AB
+    // @DisplayName: Critical sink speed rate in m/s to trigger emergency parachute
+    // @Description: Release parachute when critical sink rate is reached, no throttle check, 0 = disabled
+    // @Range: 0 15
+    // @Units: m/s
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("CRT_SNK_AB", 12, AP_Parachute, _abs_critical_sink, AP_PARACHUTE_CRITICAL_SINK_DEFAULT),
+
+    // @Param: SINK_MS
+    // @DisplayName: time in ms that the sink rate must be faster than CHUTE_CRT_SINK with throttle saturated
+    // @Description: time in ms that the sink rate must be faster than CHUTE_CRT_SINK with throttle saturated
+    // @User: Standard
+    AP_GROUPINFO("SINK_MS", 13, AP_Parachute, _sink_ms, 1000),
+
+    // @Param: SINK_AB_MS
+    // @DisplayName: time in ms that the sink rate must be faster than CHUTE_CRT_SINK_ABS
+    // @Description: time in ms that the sink rate must be faster than CHUTE_CRT_SINK_ABS
+    // @User: Standard
+    AP_GROUPINFO("SINK_AB_MS", 14, AP_Parachute, _sink_abs_ms, 1000),
+
+    // @Param: ACCEL_MS
+    // @DisplayName: time in ms that the sink rate must be lower than CHUTE_MIN_ACCEL
+    // @Description: time in ms that the sink rate must be lower than CHUTE_MIN_ACCEL
+    // @User: Standard
+    AP_GROUPINFO("ACCEL_MS", 15, AP_Parachute, _accel_ms, 1000),
+
+    // @Param: CNRL_LS_MS
+    // @DisplayName: the number of ms that control loss must have triggered
+    // @Description: the number of ms that control loss must have triggered, unlike other check this does not rest back to 0 when angle error is removed, it can also increas faster if both angle thresholds are exceeded, this is sort of a time, but not exactly
+    // @User: Standard
+    AP_GROUPINFO("CNRL_LS_MS", 16, AP_Parachute, _control_loss_ms, 1000),
+
     AP_GROUPEND
 };
 
@@ -122,6 +155,7 @@ void AP_Parachute::enabled(bool on_off)
     _cancel_timeout_ms = 0;
     _sink_time_ms = 0;
     _fall_time_ms = 0;
+    _abs_sink_time_ms = 0;
 
     AP::logger().Write_Event(_enabled ? DATA_PARACHUTE_ENABLED : DATA_PARACHUTE_DISABLED);
 }
@@ -289,6 +323,35 @@ void AP_Parachute::update()
     }
 }
 
+void AP_Parachute::write_log(uint16_t control_loss_count, float angle_error)
+{
+    if (_enabled <= 0) {
+        return;
+    }
+
+    const uint32_t now = AP_HAL::millis();
+    if ((control_loss_count == 0) && (_sink_time_ms == 0) && (_fall_time_ms == 0) && (_abs_sink_time_ms == 0) && (now < (_last_log_ms + 100))) {
+        // if no thresholds are tripping log at 10hz, else log at loop rate
+        return;
+    }
+    _last_log_ms = now;
+
+    AP_Logger *logger = AP_Logger::get_singleton();
+    if (logger == nullptr) {
+        return;
+    }
+    logger->Write("PARA", "TimeUS,CL,AngEr,Snkms,AbsSnkms,Acclms,BM,Cancelms",
+                        "s-dsss-s", "F00CCC0C", "QHfIIIBI",
+                        AP_HAL::micros64(),
+                        control_loss_count,
+                        angle_error,
+                        (_sink_time_ms == 0) ? 0 : (now - _sink_time_ms),
+                        (_abs_sink_time_ms == 0) ? 0 : (now - _abs_sink_time_ms),
+                        (_fall_time_ms == 0) ? 0 : (now - _fall_time_ms),
+                        _release_reasons,
+                        (_cancel_timeout_ms == 0)  ? 0 : (_cancel_timeout_ms - now));
+}
+
 void AP_Parachute::release_off()
 {
     if (_release_type == AP_PARACHUTE_TRIGGER_TYPE_SERVO) {
@@ -302,17 +365,18 @@ void AP_Parachute::release_off()
 
 
 // update - set vehicle sink rate and accel
-void AP_Parachute::update(const float sink_rate, const float accel, const bool throttle_below_hover)
+void AP_Parachute::update(const float sink_rate, const float accel, const bool upper_throttle_limit, const bool standby)
 {
     // reset sink time if critical sink rate check is disabled or vehicle is not flying
     if (!_is_flying) {
         _sink_time_ms = 0;
         _fall_time_ms = 0;
+        _abs_sink_time_ms = 0;
         return;
     }
 
-    // sink rate is posative down
-    if (sink_rate <= _critical_sink || !is_positive(_critical_sink) || throttle_below_hover) {
+    // sink rate is positive down, sink rate with throttle saturateion
+    if (sink_rate <= _critical_sink || !is_positive(_critical_sink) || !upper_throttle_limit || standby) {
         // reset sink_time if vehicle is not sinking too fast
         _sink_time_ms = 0;
     } else if (_sink_time_ms == 0) {
@@ -320,6 +384,16 @@ void AP_Parachute::update(const float sink_rate, const float accel, const bool t
         _sink_time_ms = AP_HAL::millis();
     }
 
+    // sink rate only
+    if (sink_rate <= _abs_critical_sink || !is_positive(_abs_critical_sink)) {
+        // reset sink_time if vehicle is not sinking too fast
+        _abs_sink_time_ms = 0;
+    } else if (_abs_sink_time_ms == 0) {
+        // start time when sinking too fast
+        _abs_sink_time_ms = AP_HAL::millis();
+    }
+
+    // accel
     if (accel <= _min_accel || !is_positive(_min_accel)) {
         // reset fall time if vehicle is not falling too fast
         _fall_time_ms = 0;
@@ -340,10 +414,16 @@ void AP_Parachute::check()
 
     // if vehicle is sinking too fast for more than a second release parachute
     uint32_t now = AP_HAL::millis();
-    if ((_sink_time_ms > 0) && ((now - _sink_time_ms) > 1000)) {
+    if ((_sink_time_ms > 0) && ((now - _sink_time_ms) > uint32_t(_sink_ms.get()))) {
+        _sink_time_ms = 0;
         release(release_reason::SINK_RATE);
     }
-    if ((_fall_time_ms > 0) && ((now - _fall_time_ms) > 1000)) {
+    if ((_abs_sink_time_ms > 0) && ((now - _abs_sink_time_ms) > uint32_t(_sink_abs_ms.get()))) {
+        _abs_sink_time_ms = 0;
+        release(release_reason::SINK_RATE);
+    }
+    if ((_fall_time_ms > 0) && ((now - _fall_time_ms) > uint32_t(_accel_ms.get()))) {
+        _fall_time_ms = 0;
         release(release_reason::ACCEL_FALLING);
     }
 }
